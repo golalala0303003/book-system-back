@@ -4,8 +4,9 @@ class ErrorMsg:
     TOKEN_EXPIRED = "无效的认证凭证或登录已过期"
     USER_NOT_FOUND = "用户不存在或已被删除"
     TOKEN_MISSING = "未提供登录凭证，请先登录"
+    INCORRECT_PASSWORD = "密码错误"
 
 class SuccessMsg:
-    REGISTER_SUCCESS = "注册成功"
+    REGISTER_SUCCESS = "注册成功ciallo"
     LOGIN_SUCCESS = "登录成功"
     GET_USER_INFO_SUCCESS = "获取用户信息成功"

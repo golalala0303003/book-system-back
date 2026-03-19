@@ -1,4 +1,6 @@
 from sqlmodel import Session
+
+from app.exceptions.user_exceptions import UserNotFoundException, IncorrectPasswordException, UserAlreadyExistsException
 from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO
 from app.models.user import User
 from app.dao.user_dao import UserDao
@@ -11,7 +13,9 @@ class UserService:
 
 
     def register(self, user_dto: UserRegisterDTO) -> bool:
-        # TODO 校验逻辑 (如查重)
+        user = self.dao.get_user_by_username(user_dto.username)
+        if user:
+            raise UserAlreadyExistsException()
 
         # 组装实体
         new_user = User(
@@ -20,10 +24,11 @@ class UserService:
         )
 
         self.dao.create_user(new_user)
+
         return True
 
 
-    def login(self, login_dto: UserLoginDTO) -> tuple[bool, str | UserLoginVO]:
+    def login(self, login_dto: UserLoginDTO) -> UserLoginVO:
         """
         用户登录业务逻辑
         返回: (是否成功, 错误信息字符串 或 UserLoginVO对象)
@@ -31,11 +36,11 @@ class UserService:
         # 1. 查找用户是否存在
         user = self.dao.get_user_by_username(login_dto.username)
         if not user:
-            return False, "用户名或密码错误"
+            raise UserNotFoundException()
 
         # 2. 校验密码是否匹配
         if not verify_password(login_dto.password, user.hashed_password):
-            return False, "用户名或密码错误"
+            raise IncorrectPasswordException()
 
         # 3. 登录成功，签发 JWT Token
         # 注意：我们将用户 ID 作为 sub 载荷
@@ -48,4 +53,4 @@ class UserService:
             username=user.username
         )
 
-        return True, login_vo
+        return login_vo
