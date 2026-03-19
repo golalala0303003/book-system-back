@@ -50,7 +50,8 @@ class UserService:
         login_vo = UserLoginVO(
             access_token=access_token,
             id=user.id,
-            username=user.username
+            username=user.username,
+            avatar=user.avatar,
         )
 
         return login_vo

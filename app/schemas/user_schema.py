@@ -18,6 +18,7 @@ class UserLoginVO(BaseModel):
     token_type: str = Field(default="bearer", description="令牌类型")
     username: str = Field(description="用户名")
     id: int = Field(description="用户ID")
+    avatar: Optional[str] = Field(description="用户头像")
 
 class UserInfoVO(BaseModel):
     """当前登录用户全量信息 VO"""

@@ -18,7 +18,6 @@ def register(user_dto: UserRegisterDTO, service: UserService = Depends()):
 
 @router.post("/login")
 def login(login_dto: UserLoginDTO, service: UserService = Depends()):
-    # TODO
     result_data = service.login(login_dto)
     return Result.success(data=result_data, message="登录成功")
 
