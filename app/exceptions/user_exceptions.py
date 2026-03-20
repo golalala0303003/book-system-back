@@ -40,3 +40,11 @@ class IncorrectPasswordException(BusinessException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ErrorMsg.INCORRECT_PASSWORD
         )
+
+class AtLeastOneFieldException(BusinessException):
+    """修改用户信息一个信息不传的异常"""
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorMsg.LEAST_ONE_FIELD
+        )

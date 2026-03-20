@@ -1,7 +1,7 @@
 from sqlmodel import Session
 
 from app.exceptions.user_exceptions import UserNotFoundException, IncorrectPasswordException, UserAlreadyExistsException
-from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO
+from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserUpdateDTO, UserInfoVO
 from app.models.user import User
 from app.dao.user_dao import UserDao
 from app.core.security import get_password_hash, verify_password, create_access_token
@@ -30,8 +30,7 @@ class UserService:
 
     def login(self, login_dto: UserLoginDTO) -> UserLoginVO:
         """
-        用户登录业务逻辑
-        返回: (是否成功, 错误信息字符串 或 UserLoginVO对象)
+        用户登录
         """
         # 1. 查找用户是否存在
         user = self.dao.get_user_by_username(login_dto.username)
@@ -55,3 +54,17 @@ class UserService:
         )
 
         return login_vo
+
+    def update_user(self, current_user: User, update_dto: UserUpdateDTO) -> UserInfoVO:
+        update_data = update_dto.model_dump(exclude_unset=True)
+
+        if "username" in update_data and update_data["username"] != current_user.username:
+            existing_user = self.dao.get_user_by_username(update_data["username"])
+            if existing_user:
+                raise UserAlreadyExistsException()
+
+        for key, value in update_data.items():
+            setattr(current_user, key, value)
+        current_user = self.dao.update_user(current_user)
+        user_info = UserInfoVO.model_validate(current_user)
+        return user_info

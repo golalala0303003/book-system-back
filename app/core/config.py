@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
+    # 阿里云配置
+    ALIYUN_BUCKET_NAME: str
+    ALIYUN_ACCESSKEY_ID: str
+    ALIYUN_ACCESSKEY_SECRET: str
+    ALIYUN_ENDPOINT: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -23,3 +23,9 @@ class UserDao:
         self.db.commit()
         self.db.refresh(user)
         return user
+
+    def update_user(self, current_user):
+        self.db.add(current_user)
+        self.db.commit()
+        self.db.refresh(current_user)
+        return current_user

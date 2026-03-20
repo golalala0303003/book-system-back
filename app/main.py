@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api import user_controller
+from app.api import upload_controller
 from sqlmodel import SQLModel
 from app.core.db import engine
 from contextlib import asynccontextmanager
@@ -31,6 +32,7 @@ app.add_middleware(
     allow_headers=["*"],         # 允许所有的请求头
 )
 app.include_router(user_controller.router)
+app.include_router(upload_controller.router)
 register_exception_handlers(app)
 
 @app.get("/")
