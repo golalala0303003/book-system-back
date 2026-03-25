@@ -68,3 +68,9 @@ class UserService:
         current_user = self.dao.update_user(current_user)
         user_info = UserInfoVO.model_validate(current_user)
         return user_info
+
+    def get_user_profile(self, user_id, cur_user_id):
+        user = self.dao.get_user_by_id(user_id)
+        user_info = UserInfoVO.model_validate(user)
+        # TODO 判定是否为自身信息，对返回的信息进行过滤
+        return user_info
