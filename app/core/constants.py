@@ -1,4 +1,5 @@
 class ErrorMsg:
+    BOOK_ALREADY_EXISTS = "该书已经存在，请勿重复添加"
     USER_ALREADY_EXISTS = "该用户名已被注册，请更换一个"
     INVALID_CREDENTIALS = "用户名或密码错误"
     TOKEN_EXPIRED = "无效的认证凭证或登录已过期"
@@ -15,6 +16,7 @@ class ErrorMsg:
     POST_NOT_EXISTS = "帖子不存在"
     COMMENT_NOT_EXISTS = "回复的父评论不存在或已被删除"
     INVALID_COMMENT_LEVEL = "parent_id 必须是一级评论的ID"
+    BOOK_NOT_EXISTS = "该书不存在"
 
 
 class SuccessMsg:
@@ -35,3 +37,14 @@ class SuccessMsg:
     COMMENT_DELETE_SUCCESS = "评论删除成功"
     GET_COMMENT_LIST_SUCCESS = "获取评论列表成功"
     ACTION_SUCCESS = "操作成功"
+    GET_BOOK_PAGE_SUCCESS = "获取图书列表成功"
+    GET_BOOK_DETAIL_SUCCESS = "获取图书详情成功"
+    GET_BOOK_TAGS_SUCCESS = "获取标签列表成功"
+
+
+class ActionWeight:
+    VIEW = 1.0       # 浏览书籍详情
+    UPVOTE = 3.0     # 点赞
+    COLLECT = 5.0    # 收藏/正在读
+    POST = 4.0       # 为书发帖
+    COMMENT = 2.0    # 在书籍相关帖子下评论

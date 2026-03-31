@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 from sqlmodel import SQLModel, Field
-from sqlalchemy import Column, DateTime, func
+from sqlalchemy import Column, DateTime, func, Text
 
 
 class User(SQLModel, table=True):
@@ -22,6 +22,8 @@ class User(SQLModel, table=True):
     age: Optional[int] = Field(default=None)  # 年龄
     gender: Optional[str] = Field(default="unknown", max_length=10)  # 性别
     school: Optional[str] = Field(default=None, max_length=100)  # 学校
+
+    feature_vector: Optional[str] = Field(default=None, sa_column=Column(Text))
 
     # 权限与状态
     role: str = Field(default="user", max_length=20)  # 角色："user" 或 "admin"
