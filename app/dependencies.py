@@ -6,6 +6,7 @@ from app.core.security import decode_access_token
 from app.dao.user_dao import UserDao
 from app.exceptions.user_exceptions import AuthFailedException
 from app.models.user import User
+from typing import Optional
 
 # HTTPBearer 规范：用于提取请求头中的 Authorization: Bearer <token>
 # 加上这个后，Swagger UI 右上角会自动出现一个 "Authorize" 的锁图标
@@ -35,4 +36,30 @@ def get_current_user(
         raise AuthFailedException(detail=ErrorMsg.USER_NOT_FOUND)
 
     # 4. 鉴权通过，返回该用户对象
+    return user
+
+
+def get_current_user_optional(
+        credentials: HTTPAuthorizationCredentials | None = Depends(token_auth_scheme),
+        user_dao: UserDao = Depends()
+) -> Optional[User]:
+    """
+    可选鉴权拦截器：尝试解析 Token
+    - 如果 Token 有效且用户存在，返回 User 对象（视为登录用户）
+    - 如果没带 Token、Token 过期或用户不存在，返回 None（视为游客访问）
+    """
+    # 没带 Token，直接放行当游客
+    if not credentials:
+        return None
+
+    # 获取并尝试解码 Token
+    token = credentials.credentials
+    user_id_str = decode_access_token(token)
+
+    # 如果 Token 解析失败或已过期，放行当游客
+    if not user_id_str:
+        return None
+
+    # 查库
+    user = user_dao.get_user_by_id(int(user_id_str))
     return user

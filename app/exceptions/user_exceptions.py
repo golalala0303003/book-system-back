@@ -48,3 +48,7 @@ class AtLeastOneFieldException(BusinessException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ErrorMsg.LEAST_ONE_FIELD
         )
+
+class UserNotPermittedException(BusinessException):
+    def __init__(self):
+        super().__init__(status_code=status.HTTP_403_FORBIDDEN, detail=ErrorMsg.USER_ALREADY_EXISTS)

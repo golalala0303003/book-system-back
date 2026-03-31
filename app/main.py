@@ -3,6 +3,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from app.api import user_controller
 from app.api import upload_controller
+from app.api import forum_controller
 from sqlmodel import SQLModel
 from app.core.db import engine
 from contextlib import asynccontextmanager
@@ -12,10 +13,8 @@ from app.exceptions.handlers import register_exception_handlers
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("启动！Ciallo～ (∠・ω< )⌒★")
     SQLModel.metadata.create_all(engine)
     yield
-    print("再见！")
 
 app = FastAPI(title="Ciallo～ (∠・ω< )⌒★", lifespan=lifespan)
 origins = [
@@ -33,6 +32,9 @@ app.add_middleware(
 )
 app.include_router(user_controller.router)
 app.include_router(upload_controller.router)
+app.include_router(forum_controller.board_router)
+app.include_router(forum_controller.post_router)
+app.include_router(forum_controller.comment_router)
 register_exception_handlers(app)
 
 @app.get("/")
