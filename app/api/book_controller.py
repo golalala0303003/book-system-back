@@ -20,6 +20,11 @@ def get_book_page(
     page_data = service.get_book_page(dto, current_user)
     return Result.success(data=page_data, message=SuccessMsg.GET_BOOK_PAGE_SUCCESS)
 
+@book_router.get("/suggest")
+def get_book_suggest(key_word: str, limit: int = 5, service: BookService = Depends()):
+    book_suggest_vo = service.get_book_suggest(key_word, limit)
+    return Result.success(data=book_suggest_vo, message=SuccessMsg.GET_BOOK_SUGGEST_SUCCESS)
+
 @book_router.get("/detail/{book_id}")
 def get_book_detail(
     book_id: int,
@@ -124,7 +129,7 @@ def calculate_tfidf_vectors(
 @book_router.get("/recommend", response_model=Result[list[BookVO]])
 def get_recommend_books(
     limit: int = 10,
-    current_user: User = Depends(get_current_user), # 获取当前登录用户
+    current_user: User = Depends(get_current_user_optional), # 获取当前登录用户
     service: BookService = Depends()
 ):
     """

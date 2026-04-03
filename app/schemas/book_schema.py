@@ -14,6 +14,14 @@ class BookQueryDTO(BaseModel):
         description="排序维度: time(最新), hot(浏览量最高), rating(评分最高)"
     )
 
+class BookSuggestVO(BaseModel):
+    id: int
+    author: Optional[str] = None
+    title: str
+    isbn: Optional[str] = None
+    cover_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 # 图书返回VO
 class BookVO(BaseModel):

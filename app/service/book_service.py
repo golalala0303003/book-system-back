@@ -10,7 +10,8 @@ from app.models.book import TagIndex
 from app.models.user import User
 from app.recommend.interest_service import UserInterestService
 from app.recommend.matrix_cache import book_matrix_cache
-from app.schemas.book_schema import BookQueryDTO, BookVO, BookVoteDTO, BookFavoriteDTO, BookCreateDTO, BookUpdateDTO
+from app.schemas.book_schema import BookQueryDTO, BookVO, BookVoteDTO, BookFavoriteDTO, BookCreateDTO, BookUpdateDTO, \
+    BookSuggestVO
 from app.schemas.result import PageData
 from sklearn.feature_extraction.text import TfidfVectorizer
 from app.recommend.vector_utils import VectorConverter
@@ -78,6 +79,11 @@ class BookService:
             size=dto.size,
             records=vo_list
         )
+
+    def get_book_suggest(self, key_word: str, limit: int) -> list[BookSuggestVO]:
+        books = self.dao.get_book_suggests(key_word, limit)
+        vo_list = [BookSuggestVO.model_validate(b) for b in books]
+        return vo_list
 
     def get_hot_tags(self):
         # TODO 这里写死了。。。我们后面再说

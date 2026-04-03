@@ -62,6 +62,22 @@ class BookDao:
 
         return total, records
 
+    def get_book_suggests(self, key_word: str, limit: int) -> list[Book | None]:
+        search_str = f"%{key_word}%"
+        statement = select(Book).where(Book.is_active == True)
+        statement = statement.where(
+            or_(
+                Book.title.like(search_str),
+                Book.author.like(search_str),
+                Book.isbn.like(search_str)
+            )
+        )
+        statement = statement.order_by(Book.view_count.desc(), Book.id.desc())
+        statement = statement.limit(limit)
+        books = self.db.exec(statement).all()
+        return books
+
+
     def record_browse_history(self, user_id: int, book_id: int):
         """记录浏览历史：存在则更新次数和时间，不存在则新增"""
         statement = select(BookBrowseHistory).where(

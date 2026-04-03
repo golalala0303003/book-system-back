@@ -20,6 +20,7 @@ class ErrorMsg:
 
 
 class SuccessMsg:
+    GET_BOOK_SUGGEST_SUCCESS = "获得书籍联想成功"
     REGISTER_SUCCESS = "注册成功ciallo"
     LOGIN_SUCCESS = "登录成功"
     GET_USER_INFO_SUCCESS = "获取用户信息成功"
