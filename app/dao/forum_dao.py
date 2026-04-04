@@ -42,7 +42,7 @@ class ForumDao:
         self.db.refresh(board_favorite)
         return board_favorite
 
-    def get_favorite_board(self, user_id: int, board_id: int) -> BookFavorite | None:
+    def get_favorite_board(self, user_id: int, board_id: int) -> BoardFavorite | None:
         statement = select(BoardFavorite).where(BoardFavorite.user_id == user_id,
                                                 BoardFavorite.board_id == board_id,
                                                 Board.is_active == True)

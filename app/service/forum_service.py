@@ -40,6 +40,22 @@ class ForumService:
         # 返回 VO
         return BoardVO.model_validate(saved_board)
 
+    def get_board_detail(self, board_id, current_user: Optional[User]) -> BoardVO:
+        board = self.dao.get_board_by_id(board_id)
+        if not board:
+            raise BoardNotExistsException()
+        board_vo = BoardVO.model_validate(board)
+        if current_user:
+            board_favorite = self.dao.get_favorite_board(current_user.id, board.id)
+            if board_favorite:
+                board_vo.fav_status = True
+            else:
+                board_vo.fav_status = False
+        else:
+            board_vo.fav_status = False
+
+        return board_vo
+
     def delete_board(self, board_id: int, current_user: User):
         # 权限校验:只允许管理员删除
         if current_user.role != "admin":

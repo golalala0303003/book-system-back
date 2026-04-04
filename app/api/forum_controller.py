@@ -26,6 +26,16 @@ def create_board(
     board_vo = service.create_board(dto, current_user)
     return Result.success(data=board_vo, message=SuccessMsg.BOARD_CREATE_SUCCESS)
 
+@board_router.get("/detail/{board_id}")
+def get_board_detail(
+    board_id: int,
+    current_user: User = Depends(get_current_user_optional),
+    service: ForumService = Depends()
+):
+    """获取板块详细信息(游客可以使用)"""
+    board_vo = service.get_board_detail(board_id, current_user)
+    return Result.success(data=board_vo, message=SuccessMsg.GET_BOARD_DETAIL_SUCCESS)
+
 
 @board_router.post("/delete")
 def delete_board(

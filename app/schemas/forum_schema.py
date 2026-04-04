@@ -22,6 +22,7 @@ class BoardVO(BaseModel):
     name: str
     description: Optional[str] = None
     cover_url: Optional[str] = None
+    fav_status: Optional[bool] = None
     creator_id: int
     moderator_id: Optional[int] = None
     create_time: datetime

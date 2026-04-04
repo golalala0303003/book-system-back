@@ -71,13 +71,13 @@ class UserService:
         user_info = UserInfoVO.model_validate(current_user)
         return user_info
 
-    def get_user_profile(self, user_id, cur_user_id: Optional[int]):
+    def get_user_profile(self, user_id, current_user: Optional[User]):
         user = self.dao.get_user_by_id(user_id)
         if not user:
             raise UserNotFoundException()
         user_info = UserInfoVO.model_validate(user)
 
-        is_self = (cur_user_id is not None) and (user_id == cur_user_id)
+        is_self = (current_user is not None) and (user_id == current_user.id)
 
         if not is_self:
             # 隐藏手机号

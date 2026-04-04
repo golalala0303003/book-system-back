@@ -39,7 +39,7 @@ def get_user_profile(
     """
     获取任意id用户的用户资料(游客可用)
     """
-    user_info = service.get_user_profile(user_id, current_user.id)
+    user_info = service.get_user_profile(user_id, current_user)
     return Result.success(data=user_info, message=SuccessMsg.GET_USER_INFO_SUCCESS)
 
 @router.post("/update")
