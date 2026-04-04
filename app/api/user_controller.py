@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.core.constants import SuccessMsg
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_current_user_optional
 from app.models import User
 from app.schemas.result import Result
 from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserInfoVO, UserUpdateDTO
@@ -31,9 +31,13 @@ def get_user_info(current_user: User = Depends(get_current_user)):
     return Result.success(data=user_info, message=SuccessMsg.GET_USER_INFO_SUCCESS)
 
 @router.get("/profile/{user_id}")
-def get_user_profile(user_id: int, service: UserService = Depends(), current_user: User = Depends(get_current_user)):
+def get_user_profile(
+        user_id: int,
+        service: UserService = Depends(),
+        current_user: User = Depends(get_current_user_optional)
+):
     """
-    获取任意id用户的用户资料
+    获取任意id用户的用户资料(游客可用)
     """
     user_info = service.get_user_profile(user_id, current_user.id)
     return Result.success(data=user_info, message=SuccessMsg.GET_USER_INFO_SUCCESS)

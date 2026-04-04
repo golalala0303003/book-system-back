@@ -1,7 +1,8 @@
 from sqlmodel import Session, select, func
 from fastapi import Depends
 from app.core.db import get_db
-from app.models.forum import Board, Post, Comment, PostVote, CommentVote
+from app.models import BookFavorite
+from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite
 from app.schemas.forum_schema import PostQueryDTO
 
 
@@ -17,9 +18,9 @@ class ForumDao:
     def get_board_by_id(self, board_id: int) -> Board | None:
         return self.db.get(Board, board_id)
 
-    def get_active_boards(self) -> list[Board]:
+    def get_active_boards(self, limit) -> list[Board]:
         """获取所有未被隐藏的板块"""
-        statement = select(Board).where(Board.is_active == True).order_by(Board.id)
+        statement = select(Board).where(Board.is_active == True).order_by(Board.post_count.desc()).limit(limit)
         return self.db.exec(statement).all()
 
     def create_board(self, board: Board) -> Board:
@@ -33,6 +34,37 @@ class ForumDao:
         self.db.commit()
         self.db.refresh(board)
         return board
+
+
+    def favorite_board(self, board_favorite: BoardFavorite) -> BoardFavorite:
+        self.db.add(board_favorite)
+        self.db.commit()
+        self.db.refresh(board_favorite)
+        return board_favorite
+
+    def get_favorite_board(self, user_id: int, board_id: int) -> BookFavorite | None:
+        statement = select(BoardFavorite).where(BoardFavorite.user_id == user_id,
+                                                BoardFavorite.board_id == board_id,
+                                                Board.is_active == True)
+        return self.db.exec(statement).first()
+
+    def delete_favorite_board(self, favorite_record):
+        self.db.delete(favorite_record)
+        self.db.commit()
+
+    def get_favorite_board_ids_by_user_id(self, limit: int, user_id: int) -> list[int] | None:
+        statement = (select(BoardFavorite.board_id)
+                     .where(BoardFavorite.user_id == user_id)
+                     .limit(limit))
+        return self.db.exec(statement).all()
+
+    def get_boards_by_ids(self, ids):
+        statement = (select(Board)
+                     .where(Board.id.in_(ids),
+                                        Board.is_active == True)
+                     .order_by(Board.post_count.desc()))
+        return self.db.exec(statement).all()
+
 
     # ---------------- 帖子相关 ----------------
     def get_post_by_id(self, post_id: int) -> Post | None:

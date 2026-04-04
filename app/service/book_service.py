@@ -21,29 +21,28 @@ class BookService:
     def __init__(self, dao: BookDao = Depends()):
         self.dao = dao
 
-    def get_book_detail(self, book_id: int, current_user: Optional[User]) -> BookVO:
+    def get_book_detail(self, book_id: int, record_view: bool, current_user: Optional[User]) -> BookVO:
         book = self.dao.get_book_by_id(book_id)
         if not book:
             raise BookNotExistsException()
 
         # 记录浏览行为 浏览量 +1
-        self.dao.increment_view_count(book_id)
-
-        if current_user:
-            UserInterestService.update_user_interest(
-                self.dao.db,
-                current_user.id,
-                book_id,
-                ActionWeight.VIEW
-            )
+        if record_view:
+            self.dao.increment_view_count(book_id)
+            if current_user:
+                # 浏览历史记录
+                self.dao.record_browse_history(current_user.id, book_id)
+                UserInterestService.update_user_interest(
+                    self.dao.db,
+                    current_user.id,
+                    book_id,
+                    ActionWeight.VIEW
+                )
 
         vo = BookVO.model_validate(book)
 
         # 为返回值添加用户的历史行为
         if current_user:
-            # 浏览历史记录插入或更新
-            self.dao.record_browse_history(current_user.id, book_id)
-
             # 单个状态夹带 (查询点赞)
             vote = self.dao.get_book_vote(current_user.id, book_id)
             if vote:

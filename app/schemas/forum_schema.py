@@ -2,6 +2,9 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
+from app.schemas.book_schema import BookVO
+from app.schemas.user_schema import UserInfoVO
+
 
 # ================= 板块 DTO,VO =================
 class BoardCreateDTO(BaseModel):
@@ -25,6 +28,9 @@ class BoardVO(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class BoardFavoriteDTO(BaseModel):
+    board_id: int = Field(..., description="要收藏的板块ID")
+    status: int = Field(..., description="1收藏-1取消收藏")
 
 # ================= 帖子 DTO & VO =================
 class PostCreateDTO(BaseModel):
@@ -45,8 +51,10 @@ class PostVO(BaseModel):
     content: str
     cover_image: Optional[str] = None
     user_id: int
+    user: Optional[UserInfoVO] = None
     board_id: int
     book_id: Optional[int] = None
+    book: Optional[BookVO] = None
     view_count: int
     upvote_count: int
     downvote_count: int

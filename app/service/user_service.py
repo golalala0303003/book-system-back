@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlmodel import Session
 
 from app.exceptions.user_exceptions import UserNotFoundException, IncorrectPasswordException, UserAlreadyExistsException
@@ -69,8 +71,29 @@ class UserService:
         user_info = UserInfoVO.model_validate(current_user)
         return user_info
 
-    def get_user_profile(self, user_id, cur_user_id):
+    def get_user_profile(self, user_id, cur_user_id: Optional[int]):
         user = self.dao.get_user_by_id(user_id)
+        if not user:
+            raise UserNotFoundException()
         user_info = UserInfoVO.model_validate(user)
-        # TODO 判定是否为自身信息，对返回的信息进行过滤
+
+        is_self = (cur_user_id is not None) and (user_id == cur_user_id)
+
+        if not is_self:
+            # 隐藏手机号
+            if user_info.phone and len(user_info.phone) >= 11:
+                user_info.phone = f"{user_info.phone[:3]}****{user_info.phone[-4:]}"
+            elif user_info.phone:
+                user_info.phone = "***"
+
+            # 隐藏邮箱
+            if user_info.email and "@" in user_info.email:
+                name, domain = user_info.email.split("@", 1)
+                if len(name) > 2:
+                    user_info.email = f"{name[:2]}***@{domain}"
+                else:
+                    user_info.email = f"***@{domain}"
+            elif user_info.email:
+                user_info.email = "***"
+
         return user_info

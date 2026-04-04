@@ -20,6 +20,7 @@ class ErrorMsg:
 
 
 class SuccessMsg:
+    GET_FAVORITE_BOARD_LIST_SUCCESS = "获取收藏板块成功"
     GET_BOOK_SUGGEST_SUCCESS = "获得书籍联想成功"
     REGISTER_SUCCESS = "注册成功ciallo"
     LOGIN_SUCCESS = "登录成功"
@@ -31,7 +32,7 @@ class SuccessMsg:
     GET_BOARD_LIST_SUCCESS = "获取板块列表成功"
     POST_CREATE_SUCCESS = "帖子创建成功"
     POST_DELETE_SUCCESS = "帖子删除成功"
-    POST_DETAIL_SUCCESS = "成功查看帖子记录"
+    GET_POST_DETAIL_SUCCESS = "成功查看帖子记录"
     POST_PAGE_SUCCESS = "成功进行了帖子分页查询"
     POST_UPDATE_SUCCESS = "帖子更新成功"
     COMMENT_CREATE_SUCCESS = "评论成功"

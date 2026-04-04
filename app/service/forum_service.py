@@ -2,15 +2,18 @@ from fastapi import Depends
 from app.dao.forum_dao import ForumDao
 from app.exceptions.user_exceptions import UserNotPermittedException
 from app.models.user import User
-from app.models.forum import Board, Post, Comment, CommentVote, PostVote
+from app.models.forum import Board, Post, Comment, CommentVote, PostVote, BoardFavorite
 from app.schemas.forum_schema import BoardCreateDTO, BoardVO, PostCreateDTO, PostVO, PostQueryDTO, PostUpdateDTO, \
-    CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO
+    CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO
 from app.exceptions.forum_exceptions import BoardAlreadyExistsException, BoardNotExistsException, \
     PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException
 from app.schemas.result import PageData
 from collections import defaultdict
 from typing import Optional
 
+from app.service.book_service import BookService
+from app.service.user_service import UserService
+import app.core.utils as utils
 
 class ForumService:
     def __init__(self, dao: ForumDao = Depends()):
@@ -52,9 +55,39 @@ class ForumService:
         self.dao.update_board(board)
         return True
 
-    def get_all_boards(self) -> list[BoardVO]:
-        boards = self.dao.get_active_boards()
+    def get_all_boards(self, limit) -> list[BoardVO]:
+        boards = self.dao.get_active_boards(limit)
         return [BoardVO.model_validate(b) for b in boards]
+
+
+    def get_favorite_board_list(self, limit: int, current_user: User):
+        # 没有登录的时候返回空
+        if not current_user:
+            return []
+        else:
+            # 获取用户收藏的所有板块的id
+            ids = self.dao.get_favorite_board_ids_by_user_id(limit, current_user.id)
+            # 根据id批量查询板块
+            boards = self.dao.get_boards_by_ids(ids)
+            return [BoardVO.model_validate(b) for b in boards]
+
+
+    def favorite_board(self, dto: BoardFavoriteDTO, current_user: User):
+        # 收藏
+        if dto.status == 1:
+            favorite_record = self.dao.get_favorite_board(current_user.id, dto.board_id)
+            if favorite_record:
+                return
+            new_board_favorite = BoardFavorite(
+                user_id=current_user.id,
+                board_id=dto.board_id,
+            )
+            self.dao.favorite_board(new_board_favorite)
+        else:
+            favorite_record = self.dao.get_favorite_board(current_user.id, dto.board_id)
+            if not favorite_record:
+                return
+            self.dao.delete_favorite_board(favorite_record)
 
     # ---------------- 帖子业务 ----------------
     def create_post(self, dto: PostCreateDTO, current_user: User) -> PostVO:
@@ -96,12 +129,14 @@ class ForumService:
         # TODO 删除关联的评论
         return True
 
-    def get_post_detail(self, post_id: int, current_user: Optional[User]) -> PostVO:
+    def get_post_detail(self, post_id: int, record_view: bool, current_user: Optional[User]) -> PostVO:
         post = self.dao.get_post_by_id(post_id)
         if not post:
             raise PostNotExistsException()
 
-        self.dao.increment_view_count(post_id)
+        if record_view:
+            self.dao.increment_view_count(post_id)
+            # TODO 记录本次阅读行为
 
         vo = PostVO.model_validate(post)
 
@@ -114,7 +149,12 @@ class ForumService:
 
     def get_post_page(self, dto: PostQueryDTO, current_user: Optional[User]) -> PageData[PostVO]:
         total, records = self.dao.get_posts_page(dto)
-        vo_list = [PostVO.model_validate(p) for p in records]
+        vo_list = []
+        for p in records:
+            post_info = PostVO.model_validate(p)
+            # TODO 这里可以替换成大模型总结
+            post_info.content = utils.extract_summary(post_info.content, 30)
+            vo_list.append(post_info)
 
         # 如果用户已登录，并且当前页有数据，进行批量状态拼装
         if current_user and vo_list:
@@ -124,10 +164,6 @@ class ForumService:
                 vo.my_vote = vote_map.get(vo.id, 0)
 
         return PageData(total=total, page=dto.page, size=dto.size, records=vo_list)
-
-    def record_user_view_history(self, cur_user_id, post_id):
-        # TODO 完善浏览记录逻辑
-        print(f"该用户{cur_user_id}阅读了{post_id}帖子")
 
     def update_post(self, dto: PostUpdateDTO, current_user: User) -> PostVO:
         # 查出帖子

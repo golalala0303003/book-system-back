@@ -16,11 +16,23 @@ class Board(SQLModel, table=True):
     moderator_id: Optional[int] = Field(default=None, index=True)  # 版主ID 暂时无用
     is_active: bool = Field(default=True)  # 状态：True正常，False隐藏封禁
 
+    post_count: int = Field(default=0) # 该板块下的帖子数量
+
     create_time: datetime = Field(sa_column=Column(DateTime, server_default=func.now(), nullable=False))
     update_time: datetime = Field(
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     )
 
+class BoardFavorite(SQLModel, table=True):
+    __tablename__ = "board_favorite"
+
+    __table_args__ = (UniqueConstraint("user_id", "board_id", name="uq_user_board_favorite"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    board_id: int = Field(index=True)
+
+    create_time: datetime = Field(sa_column=Column(DateTime, server_default=func.now()))
 
 # 帖子表
 class Post(SQLModel, table=True):

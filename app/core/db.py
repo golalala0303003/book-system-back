@@ -8,7 +8,7 @@ DATABASE_URL = (
 )
 
 # 创建全局的数据库引擎
-engine = create_engine(DATABASE_URL, echo=True)
+engine = create_engine(DATABASE_URL, echo=False)
 
 def get_db():
     """

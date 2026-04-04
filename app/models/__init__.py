@@ -5,6 +5,7 @@ from .forum import Post
 from .forum import Comment
 from .forum import PostVote
 from .forum import CommentVote
+from .forum import BoardFavorite
 
 from .book import Book
 from .book import BookVote

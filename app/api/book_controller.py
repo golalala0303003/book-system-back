@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from typing import Optional
 from app.models.user import User
 from app.dependencies import get_current_user_optional, get_current_user
@@ -28,11 +28,12 @@ def get_book_suggest(key_word: str, limit: int = 5, service: BookService = Depen
 @book_router.get("/detail/{book_id}")
 def get_book_detail(
     book_id: int,
+    record_view: bool = Query(True, description="是否记录浏览记录和浏览量"),
     current_user: Optional[User] = Depends(get_current_user_optional),
     service: BookService = Depends()
 ):
     """获取图书详情 (游客可用，附带浏览量+1与历史记录)"""
-    book_vo = service.get_book_detail(book_id, current_user)
+    book_vo = service.get_book_detail(book_id, record_view, current_user)
     return Result.success(data=book_vo, message=SuccessMsg.GET_BOOK_DETAIL_SUCCESS)
 
 @book_router.get("/tags")

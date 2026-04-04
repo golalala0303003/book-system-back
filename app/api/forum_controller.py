@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.constants import SuccessMsg
 from app.models.user import User
 from app.dependencies import get_current_user, get_current_user_optional
+from app.service.book_service import BookService
 from app.service.forum_service import ForumService
 from app.schemas.forum_schema import BoardCreateDTO, BoardDeleteDTO, BoardVO, PostQueryDTO, PostUpdateDTO, \
-    CommentCreateDTO, CommentDeleteDTO, PostVoteDTO, CommentVoteDTO
+    CommentCreateDTO, CommentDeleteDTO, PostVoteDTO, CommentVoteDTO, BoardFavoriteDTO
 from app.schemas.forum_schema import PostCreateDTO, PostDeleteDTO, PostVO
 from app.schemas.result import Result
 from typing import Optional
+from app.service.user_service import UserService
 
 board_router = APIRouter(prefix="/board", tags=["论坛-板块模块"])
 post_router = APIRouter(prefix="/post", tags=["论坛-帖子模块"])
@@ -37,11 +39,32 @@ def delete_board(
 
 @board_router.get("/list")
 def get_board_list(
+    limit: int = 10,
     service: ForumService = Depends()
 ):
     """获取所有可用板块列表 (无需登录即可查看)"""
-    board_list = service.get_all_boards()
+    board_list = service.get_all_boards(limit)
     return Result.success(data=board_list, message=SuccessMsg.GET_BOARD_LIST_SUCCESS)
+
+@board_router.post("/favorite")
+def favorite_board(
+    dto: BoardFavoriteDTO,
+    current_user: User = Depends(get_current_user),
+    service: ForumService = Depends()
+):
+    """收藏板块行为（需要登录） 1收藏-1取消收藏"""
+    service.favorite_board(dto, current_user)
+    return Result.success(message=SuccessMsg.ACTION_SUCCESS)
+
+@board_router.get("/favorite_list")
+def get_favorite_list(
+    limit: int = 10,
+    current_user: User = Depends(get_current_user_optional),
+    service: ForumService = Depends()
+):
+    """获取该用户收藏的板块(不登录也可以，但是返回的是按照热门程度返回的)"""
+    favorite_board_list = service.get_favorite_board_list(limit, current_user)
+    return Result.success(data=favorite_board_list, message=SuccessMsg.GET_FAVORITE_BOARD_LIST_SUCCESS)
 
 @post_router.post("/create")
 def create_post(
@@ -68,28 +91,35 @@ def delete_post(
 @post_router.get("/detail/{post_id}")
 def get_post_detail(
         post_id: int,
-        # 可选鉴权：如果没有 token，current_user 就是 None
+        record_view: bool = Query(True, description="是否要记录浏览记录"),
         current_user: Optional[User] = Depends(get_current_user_optional),
-        service: ForumService = Depends()
+        forum_service: ForumService = Depends(),
+        book_service: BookService = Depends(),
+        user_service: UserService = Depends()
 ):
     """查看帖子详情 (游客可用，附带浏览量+1)"""
-    post_vo = service.get_post_detail(post_id, current_user)
+    post_vo = forum_service.get_post_detail(post_id, record_view, current_user)
+    if post_vo.book_id:
+        post_vo.book = book_service.get_book_detail(post_vo.book_id, False, current_user)
+    post_vo.user = user_service.get_user_profile(post_vo.user_id, current_user)
 
-    # 记录浏览记录
-    if current_user:
-        service.record_user_view_history(current_user.id, post_id)
-
-    return Result.success(data=post_vo, message=SuccessMsg.POST_DETAIL_SUCCESS)
+    return Result.success(data=post_vo, message=SuccessMsg.GET_POST_DETAIL_SUCCESS)
 
 
 @post_router.post("/page")
 def get_post_page(
         dto: PostQueryDTO,
         current_user: Optional[User] = Depends(get_current_user_optional),
-        service: ForumService = Depends()
+        forum_service: ForumService = Depends(),
+        book_service: BookService = Depends(),
+        user_service: UserService = Depends()
 ):
     """通用分页查询帖子 (游客也可以)"""
-    page_data = service.get_post_page(dto, current_user)
+    page_data = forum_service.get_post_page(dto, current_user)
+    for vo in page_data.records:
+        vo.user = user_service.get_user_profile(vo.user_id, current_user)
+        if vo.book_id:
+            vo.book = book_service.get_book_detail(vo.book_id, False, current_user)
     return Result.success(data=page_data, message=SuccessMsg.POST_PAGE_SUCCESS)
 
 @post_router.post("/update")
