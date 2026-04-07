@@ -29,6 +29,11 @@ class BoardVO(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class BoardSuggestVO(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
 class BoardFavoriteDTO(BaseModel):
     board_id: int = Field(..., description="要收藏的板块ID")
     status: int = Field(..., description="1收藏-1取消收藏")
@@ -108,9 +113,16 @@ class CommentDeleteDTO(BaseModel):
 class CommentVO(BaseModel):
     id: int
     post_id: int
+
     user_id: int
-    parent_id: Optional[int] = None
+    user_name: Optional[str] = None
+    user_avatar_url: Optional[str] = None
+
+    parent_id: Optional[int] = None  # 父评论id
+
     reply_to_user_id: Optional[int] = None
+    reply_to_user_name: Optional[str] = None
+
     content: str
     upvote_count: int
     downvote_count: int

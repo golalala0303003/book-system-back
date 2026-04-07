@@ -35,12 +35,19 @@ class ForumDao:
         self.db.refresh(board)
         return board
 
-
     def favorite_board(self, board_favorite: BoardFavorite) -> BoardFavorite:
         self.db.add(board_favorite)
         self.db.commit()
         self.db.refresh(board_favorite)
         return board_favorite
+
+    def get_board_by_keyword(self, key_word, limit):
+        search_str = f"%{key_word}%"
+        statement = select(Board).where(Board.is_active == True)
+        statement = statement.where(Board.name.like(search_str))
+        statement = statement.limit(limit)
+        boards = self.db.exec(statement).all()
+        return boards
 
     def get_favorite_board(self, user_id: int, board_id: int) -> BoardFavorite | None:
         statement = select(BoardFavorite).where(BoardFavorite.user_id == user_id,

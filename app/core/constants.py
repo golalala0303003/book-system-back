@@ -20,6 +20,7 @@ class ErrorMsg:
 
 
 class SuccessMsg:
+    GET_BOARD_SUGGEST_SUCCESS = "获取板块联想成功"
     GET_BOARD_DETAIL_SUCCESS = "获取板块信息成功"
     GET_FAVORITE_BOARD_LIST_SUCCESS = "获取收藏板块成功"
     GET_BOOK_SUGGEST_SUCCESS = "获得书籍联想成功"

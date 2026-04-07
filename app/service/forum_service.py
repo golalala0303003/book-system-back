@@ -1,10 +1,11 @@
 from fastapi import Depends
 from app.dao.forum_dao import ForumDao
-from app.exceptions.user_exceptions import UserNotPermittedException
+from app.dao.user_dao import UserDao
+from app.exceptions.user_exceptions import UserNotPermittedException, UserNotFoundException
 from app.models.user import User
 from app.models.forum import Board, Post, Comment, CommentVote, PostVote, BoardFavorite
 from app.schemas.forum_schema import BoardCreateDTO, BoardVO, PostCreateDTO, PostVO, PostQueryDTO, PostUpdateDTO, \
-    CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO
+    CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO, BoardSuggestVO
 from app.exceptions.forum_exceptions import BoardAlreadyExistsException, BoardNotExistsException, \
     PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException
 from app.schemas.result import PageData
@@ -16,8 +17,9 @@ from app.service.user_service import UserService
 import app.core.utils as utils
 
 class ForumService:
-    def __init__(self, dao: ForumDao = Depends()):
+    def __init__(self, dao: ForumDao = Depends(), user_dao: UserDao = Depends()):
         self.dao = dao
+        self.user_dao = user_dao
 
     # ---------------- 板块业务 ----------------
     def create_board(self, dto: BoardCreateDTO, current_user: User) -> BoardVO:
@@ -87,6 +89,10 @@ class ForumService:
             boards = self.dao.get_boards_by_ids(ids)
             return [BoardVO.model_validate(b) for b in boards]
 
+    def get_board_suggest(self, key_word, limit):
+        boards = self.dao.get_board_by_keyword(key_word, limit)
+        vo_list = [BoardSuggestVO.model_validate(b) for b in boards]
+        return vo_list
 
     def favorite_board(self, dto: BoardFavoriteDTO, current_user: User):
         # 收藏
@@ -236,7 +242,18 @@ class ForumService:
         post.comment_count += 1
         self.dao.update_post(post)
 
-        return CommentVO.model_validate(saved_comment)
+        comment_vo = CommentVO.model_validate(saved_comment)
+
+        user_cur_comment = self.user_dao.get_user_by_id(comment_vo.user_id)
+        if not user_cur_comment:
+            raise UserNotFoundException()
+        comment_vo.user_name = user_cur_comment.username
+        comment_vo.user_avatar_url = user_cur_comment.avatar
+        if comment_vo.reply_to_user_id:
+            user_reply = self.user_dao.get_user_by_id(comment_vo.reply_to_user_id)
+            comment_vo.reply_to_user_name = user_reply.username
+
+        return comment_vo
 
     def delete_comment(self, comment_id: int, current_user: User):
         comment = self.dao.get_comment_by_id(comment_id)
@@ -276,11 +293,32 @@ class ForumService:
         for c in comments:
             if c.parent_id is None:
                 vo = RootCommentVO.model_validate(c)
+
+                # 加入发帖人部分信息
+                user_cur_comment = self.user_dao.get_user_by_id(vo.user_id)
+                if not user_cur_comment:
+                    raise UserNotFoundException()
+                vo.user_name = user_cur_comment.username
+                vo.user_avatar_url = user_cur_comment.avatar
+
                 # 注入 my_vote
                 vo.my_vote = vote_map.get(c.id, 0)
                 root_comments_map[c.id] = vo
             else:
                 vo = CommentVO.model_validate(c)
+
+                # 加入发帖人部分信息
+                user_cur_comment = self.user_dao.get_user_by_id(vo.user_id)
+                if not user_cur_comment:
+                    raise UserNotFoundException()
+                vo.user_name = user_cur_comment.username
+                vo.user_avatar_url = user_cur_comment.avatar
+
+                #加入回复人名称
+                if vo.reply_to_user_id:
+                    user_reply = self.user_dao.get_user_by_id(vo.reply_to_user_id)
+                    vo.reply_to_user_name = user_reply.username
+
                 # 注入 my_vote
                 vo.my_vote = vote_map.get(c.id, 0)
                 children_dict[c.parent_id].append(vo)

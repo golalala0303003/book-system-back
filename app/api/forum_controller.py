@@ -56,6 +56,16 @@ def get_board_list(
     board_list = service.get_all_boards(limit)
     return Result.success(data=board_list, message=SuccessMsg.GET_BOARD_LIST_SUCCESS)
 
+@board_router.post("/suggest")
+def get_board_suggest(
+    key_word: str,
+    limit: int = 5,
+    service: ForumService = Depends()
+):
+    """获取板块搜索的联想"""
+    board_suggest_list = service.get_board_suggest(key_word, limit)
+    return Result.success(data=board_suggest_list, message=SuccessMsg.GET_BOARD_SUGGEST_SUCCESS)
+
 @board_router.post("/favorite")
 def favorite_board(
     dto: BoardFavoriteDTO,
