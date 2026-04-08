@@ -8,7 +8,7 @@ from app.service.forum_service import ForumService
 from app.schemas.forum_schema import BoardCreateDTO, BoardDeleteDTO, BoardVO, PostQueryDTO, PostUpdateDTO, \
     CommentCreateDTO, CommentDeleteDTO, PostVoteDTO, CommentVoteDTO, BoardFavoriteDTO
 from app.schemas.forum_schema import PostCreateDTO, PostDeleteDTO, PostVO
-from app.schemas.result import Result
+from app.schemas.result import Result, PageData
 from typing import Optional
 from app.service.user_service import UserService
 
@@ -204,3 +204,30 @@ def vote_comment(
     service.vote_comment(dto, current_user)
     return Result.success(message=SuccessMsg.ACTION_SUCCESS)
 
+
+@post_router.post("/recommend/page", response_model=Result[PageData[PostVO]])
+def get_recommend_posts_page(
+    page: int = Query(default=1, ge=1, description="当前页码"),
+    size: int = Query(default=10, ge=1, le=50, description="每页条数"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    forum_service: ForumService = Depends(),
+    book_service: BookService = Depends(),
+    user_service: UserService = Depends()
+):
+    """
+    分页获取论坛首页个性化推荐帖子
+    """
+    # 获取关联的图书 ID
+    recommended_books = book_service.get_personalized_recommendations(current_user, limit=20)
+    book_ids = [book.id for book in recommended_books if book.id]
+
+    # 进行分页查询
+    page_data = forum_service.get_recommended_posts_page(book_ids, page, size, current_user)
+
+    # 组装实体信息
+    for vo in page_data.records:
+        vo.user = user_service.get_user_profile(vo.user_id, current_user)
+        if vo.book_id:
+            vo.book = book_service.get_book_detail(vo.book_id, False, current_user)
+
+    return Result.success(data=page_data, message="获取个性化帖子推荐成功")

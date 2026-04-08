@@ -410,3 +410,27 @@ class ForumService:
         self.dao.db.add(comment)
         self.dao.db.commit()
         return True
+
+    def get_recommended_posts_page(self, book_ids: list[int], page: int, size: int, current_user: Optional[User]) -> \
+    PageData[PostVO]:
+        """
+        获取分页推荐帖子
+        """
+        # 1. 调用 DAO 层的统一查询
+        total, posts = self.dao.get_unified_recommend_posts_page(book_ids, page, size)
+
+        # 2. 实体转换与内容摘要提取
+        vo_list = []
+        for p in posts:
+            post_info = PostVO.model_validate(p)
+            post_info.content = utils.extract_summary(post_info.content, 30)
+            vo_list.append(post_info)
+
+        # 3. 如果用户已登录，批量拼装点赞/踩状态
+        if current_user and vo_list:
+            post_ids_list = [vo.id for vo in vo_list]
+            vote_map = self.dao.get_user_post_votes_batch(current_user.id, post_ids_list)
+            for vo in vo_list:
+                vo.my_vote = vote_map.get(vo.id, 0)
+
+        return PageData(total=total, page=page, size=size, records=vo_list)

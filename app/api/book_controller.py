@@ -1,5 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from typing import Optional
+
+from scipy.stats import describe
+
 from app.models.user import User
 from app.dependencies import get_current_user_optional, get_current_user
 from app.schemas.result import Result
@@ -138,3 +141,15 @@ def get_recommend_books(
     """
     recommendations = service.get_personalized_recommendations(current_user, limit)
     return Result.success(data=recommendations)
+
+@book_router.get("/similar", response_model=Result[list[BookVO]])
+def get_similar_books(
+    book_id: int = Query(..., description="需要查询相似推荐的目标图书ID"),
+    limit: int = Query(default=10, ge=1, le=50, description="推荐返回的最大数量"),
+    service: BookService = Depends()
+):
+    """
+    根据图书ID获取相似书籍推荐
+    """
+    recommendations = service.get_similar_books(book_id=book_id, limit=limit)
+    return Result.success(data=recommendations, message=SuccessMsg.GET_SIMILAR_BOOKS_SUCCESS)

@@ -186,3 +186,11 @@ class BookDao:
         """获取全站热门书籍 (按浏览量或收藏量降序，用于冷启动)"""
         statement = select(Book).order_by(Book.view_count.desc()).limit(limit)
         return self.db.exec(statement).all()
+
+    def get_tag_names_by_indices(self, indices: list[int]) -> list[str]:
+        """根据索引值列表反向解析出标签中文名称"""
+        if not indices:
+            return []
+        # col() 是 sqlmodel 处理 in_ 的标准写法
+        statement = select(TagIndex.tag_name).where(col(TagIndex.index_value).in_(indices))
+        return self.db.exec(statement).all()

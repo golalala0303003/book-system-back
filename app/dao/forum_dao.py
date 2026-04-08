@@ -4,7 +4,7 @@ from app.core.db import get_db
 from app.models import BookFavorite
 from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite
 from app.schemas.forum_schema import PostQueryDTO
-
+from sqlalchemy import case
 
 class ForumDao:
     def __init__(self, db: Session = Depends(get_db)):
@@ -198,3 +198,62 @@ class ForumDao:
         )
         votes = self.db.exec(statement).all()
         return {v.comment_id: v.vote_type for v in votes}
+
+    def get_posts_by_book_ids(self, book_ids: list[int], limit: int) -> list[Post]:
+        """根据关联的图书ID集合批量查询帖子，按浏览量降序"""
+        if not book_ids:
+            return []
+        statement = (
+            select(Post)
+            .where(Post.book_id.in_(book_ids))
+            .where(Post.is_deleted == False)
+            .order_by(Post.view_count.desc())
+            .limit(limit)
+        )
+        return self.db.exec(statement).all()
+
+    def get_hot_posts_exclude_ids(self, exclude_ids: list[int], limit: int) -> list[Post]:
+        """获取全站热门帖子（按浏览量降序），并排除指定的帖子ID"""
+        if limit <= 0:
+            return []
+        statement = select(Post).where(Post.is_deleted == False)
+
+        if exclude_ids:
+            statement = statement.where(Post.id.not_in(exclude_ids))
+
+        statement = statement.order_by(Post.view_count.desc()).limit(limit)
+        return self.db.exec(statement).all()
+
+    def get_unified_recommend_posts_page(self, book_ids: list[int], page: int, size: int) -> tuple[int, list[Post]]:
+        """
+        统一推荐查询：优先展示 book_id 在推荐列表中的帖子，其次展示全站热门帖子，支持标准分页
+        """
+        # 1. 查询总条数 (就是全站所有未删除的帖子总数)
+        count_stmt = select(func.count()).select_from(Post).where(Post.is_deleted == False)
+        total = self.db.exec(count_stmt).one()
+
+        # 2. 构建分页查询
+        statement = select(Post).where(Post.is_deleted == False)
+
+        if book_ids:
+            # 核心魔法：构建一个虚拟的排序权重列
+            # 如果帖子的 book_id 在推荐书单里，权重为 1，否则为 0
+            is_recommended = case(
+                (Post.book_id.in_(book_ids), 1),
+                else_=0
+            )
+            # 排序规则：先按权重排（推荐的在前），权重相同的按浏览量排，最后按时间兜底
+            statement = statement.order_by(
+                is_recommended.desc(),
+                Post.view_count.desc(),
+                Post.create_time.desc()
+            )
+        else:
+            # 如果没有推荐书单，直接按浏览量排序
+            statement = statement.order_by(Post.view_count.desc(), Post.create_time.desc())
+
+        # 标准分页
+        statement = statement.offset((page - 1) * size).limit(size)
+        records = self.db.exec(statement).all()
+
+        return total, records

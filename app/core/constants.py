@@ -21,6 +21,8 @@ class ErrorMsg:
 
 
 class SuccessMsg:
+    GET_POST_RECOMMEND_SUCCESS = "获取帖子推荐成功"
+    GET_SIMILAR_BOOKS_SUCCESS = "获取关联图书成功"
     GET_BOARD_SUGGEST_SUCCESS = "获取板块联想成功"
     GET_BOARD_DETAIL_SUCCESS = "获取板块信息成功"
     GET_FAVORITE_BOARD_LIST_SUCCESS = "获取收藏板块成功"
@@ -88,3 +90,32 @@ class PromptTemplates:
         # 使用 safe_dict 处理可能的 None 值，防止格式化报错
         safe_dict = {k: (v if v is not None else "未知") for k, v in book.items()}
         return cls.BOOK_KNOWLEDGE_SYSTEM_PROMPT.format(**safe_dict)
+
+    # 专属个性化推荐语 Prompt
+    BOOK_RECOMMEND_REASON_PROMPT = """你是一位懂用户的资深图书推荐官。
+当前用户非常喜欢【{matching_tags}】等元素，基于此，系统为他匹配了以下书籍：
+
+书名：《{title}》
+作者：{author}
+标签：{tags}
+内容简介：{summary}
+
+请你为用户撰写一段专属的推荐语。
+【撰写要求】
+1. 必须逐个明确点出书籍内容与用户喜好（{matching_tags}）的契合之处。
+2. 结合内容简介与标签，用像朋友“种草”一样的语气来写。
+3. 严格限制字数在 200 字左右，不要废话。
+4. 直接输出推荐语正文，绝对不要包含“为您推荐”、“好的”等任何多余的开场白或解释性废话。"""
+
+    @classmethod
+    def build_book_recommend_reason_prompt(cls, book: dict, matching_tags: list[str]) -> str:
+        """
+        构建带有个性化匹配标签的推荐语提示词
+        """
+        safe_dict = {k: (v if v is not None else "未知") for k, v in book.items()}
+        # 将匹配的标签列表转为逗号分隔的字符串
+        matching_tags_str = "、".join(matching_tags) if matching_tags else "各类优秀书籍"
+        return cls.BOOK_RECOMMEND_REASON_PROMPT.format(
+            matching_tags=matching_tags_str,
+            **safe_dict
+        )

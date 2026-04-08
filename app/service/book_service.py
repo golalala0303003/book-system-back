@@ -376,3 +376,51 @@ class BookService:
         sorted_books = [book_map[bid] for bid in top_book_ids if bid in book_map]
 
         return [BookVO.model_validate(b) for b in sorted_books]
+
+    def get_similar_books(self, book_id: int, limit: int = 10) -> list[BookVO]:
+        """
+        根据指定图书获取相似图书推荐 (Item-to-Item)
+        """
+        # 获取目标书籍的特征向量
+        target_vector = book_matrix_cache.get_vector(book_id)
+
+        # 如果目标书籍没有向量，兜底返回热门书籍
+        if not target_vector:
+            hot_books = self.dao.get_hot_books(limit)
+            return [BookVO.model_validate(b) for b in hot_books]
+
+        book_scores = []
+        all_book_vectors = book_matrix_cache.get_all_vectors()
+
+        # 遍历全库计算相似度（点乘）
+        for current_book_id, current_vector in all_book_vectors.items():
+            # 剔除目标书籍本身，不能把这本书自己推荐给自己
+            if current_book_id == book_id:
+                continue
+
+            score = 0.0
+            # 稀疏向量求点乘
+            for tag_index, weight in target_vector.items():
+                if tag_index in current_vector:
+                    score += weight * current_vector[tag_index]
+
+            if score > 0:
+                book_scores.append((current_book_id, score))
+
+        # 排序并截取 Top N
+        if not book_scores:
+            hot_books = self.dao.get_hot_books(limit)
+            return [BookVO.model_validate(b) for b in hot_books]
+
+        # 按得分从高到低排序
+        book_scores.sort(key=lambda x: x[1], reverse=True)
+        top_book_ids = [bid for bid, score in book_scores[:limit]]
+
+        # 从数据库获取实体数据
+        books = self.dao.get_books_by_ids(top_book_ids)
+
+        # 数据库的 IN 查询返回结果通常是无序的，须按得分顺序重新排队
+        book_map = {book.id: book for book in books}
+        sorted_books = [book_map[bid] for bid in top_book_ids if bid in book_map]
+
+        return [BookVO.model_validate(b) for b in sorted_books]

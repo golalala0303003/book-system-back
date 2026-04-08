@@ -28,3 +28,19 @@ async def chat_about_book(
 
     # 必须指定 media_type="text/event-stream" ，这是前端接收流式数据的标准格式
     return StreamingResponse(generator, media_type="text/event-stream")
+
+@ai_router.get("/reason/{book_id}")
+async def get_book_recommend_reason(
+    book_id: int,
+    current_user: User = Depends(get_current_user), # 强制拦截未登录用户
+    service: AIService = Depends()
+):
+    """
+    流式获取针对该用户的个性化书籍推荐语 (SSE)
+    """
+    generator = service.get_recommend_reason_stream(
+        book_id=book_id,
+        current_user=current_user
+    )
+
+    return StreamingResponse(generator, media_type="text/event-stream")
