@@ -58,6 +58,17 @@ class Post(SQLModel, table=True):
         sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
     )
 
+class PostBrowseHistory(SQLModel, table=True):
+    __tablename__ = "post_browse_history"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    post_id: int = Field(index=True)
+
+    # 记录最后一次浏览时间
+    last_view_time: datetime = Field(sa_column=Column(DateTime, server_default=func.now(), onupdate=func.now()))
+    # 记录浏览次数，次数越多权重越高
+    view_times: int = Field(default=1)
 
 # 评论表
 class Comment(SQLModel, table=True):

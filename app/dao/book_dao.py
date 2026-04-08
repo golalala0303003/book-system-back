@@ -124,6 +124,12 @@ class BookDao:
         favorites = self.db.exec(statement).all()
         return {f.book_id: f.status for f in favorites}
 
+
+    def get_all_favorite_books_by_id(self, user_id):
+        statement = select(BookFavorite.book_id).where(BookFavorite.user_id == user_id).order_by(BookFavorite.create_time)
+        ids = self.db.exec(statement).all()
+        return ids
+
     def get_book_by_douban_id(self, douban_id: str) -> Book | None:
         """根据豆瓣ID查询书籍 (包含已下架的，防止重复录入)"""
         statement = select(Book).where(Book.douban_id == douban_id)

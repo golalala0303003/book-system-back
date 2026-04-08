@@ -424,3 +424,6 @@ class BookService:
         sorted_books = [book_map[bid] for bid in top_book_ids if bid in book_map]
 
         return [BookVO.model_validate(b) for b in sorted_books]
+
+    def get_favorite_books(self, user_id):
+        return self.dao.get_all_favorite_books_by_id(user_id)

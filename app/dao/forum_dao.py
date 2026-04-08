@@ -2,7 +2,7 @@ from sqlmodel import Session, select, func
 from fastapi import Depends
 from app.core.db import get_db
 from app.models import BookFavorite
-from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite
+from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite, PostBrowseHistory
 from app.schemas.forum_schema import PostQueryDTO
 from sqlalchemy import case
 
@@ -257,3 +257,24 @@ class ForumDao:
         records = self.db.exec(statement).all()
 
         return total, records
+
+    def record_browse_history(self, user_id, post_id):
+        """记录浏览历史：存在则更新次数和时间，不存在则新增"""
+        statement = select(PostBrowseHistory).where(
+            PostBrowseHistory.user_id == user_id,
+            PostBrowseHistory.post_id == post_id
+        )
+        history = self.db.exec(statement).first()
+
+        if history:
+            history.view_times += 1
+            self.db.add(history)
+        else:
+            new_history = PostBrowseHistory(user_id=user_id, post_id=post_id)
+            self.db.add(new_history)
+
+        self.db.commit()
+
+    def get_post_browse_ids(self, user_id):
+        statement = select(PostBrowseHistory.post_id).where(PostBrowseHistory.user_id == user_id).order_by(PostBrowseHistory.last_view_time.desc())
+        return self.db.exec(statement).all()

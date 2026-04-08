@@ -159,6 +159,8 @@ class ForumService:
         if record_view:
             self.dao.increment_view_count(post_id)
             # TODO 记录本次阅读行为
+            if current_user:
+                self.dao.record_browse_history(current_user.id, post_id)
 
         vo = PostVO.model_validate(post)
 
@@ -186,6 +188,19 @@ class ForumService:
                 vo.my_vote = vote_map.get(vo.id, 0)
 
         return PageData(total=total, page=dto.page, size=dto.size, records=vo_list)
+
+
+    def get_browse_books(self, user_id):
+        ids = self.dao.get_post_browse_ids(user_id)
+        vo_list = []
+        for post_id in ids:
+            post = self.dao.get_post_by_id(post_id)
+            post_vo = PostVO.model_validate(post)
+            post_vo.content = utils.extract_summary(post_vo.content, 30)
+            vo_list.append(post_vo)
+
+        return vo_list
+
 
     def update_post(self, dto: PostUpdateDTO, current_user: User) -> PostVO:
         # 查出帖子

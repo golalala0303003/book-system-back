@@ -142,6 +142,20 @@ def get_post_page(
             vo.book = book_service.get_book_detail(vo.book_id, False, current_user)
     return Result.success(data=page_data, message=SuccessMsg.POST_PAGE_SUCCESS)
 
+@post_router.get("/history")
+def get_post_browse_history(
+        user_id: int = Query(..., description="要查询的用户id"),
+        forum_service: ForumService = Depends(),
+        book_service: BookService = Depends(),
+        user_service: UserService = Depends()
+):
+    posts = forum_service.get_browse_books(user_id)
+    for post in posts:
+        post.user = user_service.get_user_profile(post.user_id, None)
+        if post.book_id:
+            post.book = book_service.get_book_detail(post.book_id, False, None)
+    return Result.success(data=posts, message="获取浏览记录成功")
+
 @post_router.post("/update")
 def update_post(
     dto: PostUpdateDTO,

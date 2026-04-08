@@ -21,6 +21,7 @@ class ErrorMsg:
 
 
 class SuccessMsg:
+    GET_FAV_BOOKS_SUCCESS = "获取收藏书籍成功"
     GET_POST_RECOMMEND_SUCCESS = "获取帖子推荐成功"
     GET_SIMILAR_BOOKS_SUCCESS = "获取关联图书成功"
     GET_BOARD_SUGGEST_SUCCESS = "获取板块联想成功"

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import Optional
 
 from scipy.stats import describe
+from sqlalchemy import false
 
 from app.models.user import User
 from app.dependencies import get_current_user_optional, get_current_user
@@ -10,6 +11,7 @@ from app.schemas.book_schema import BookQueryDTO, BookVoteDTO, BookFavoriteDTO, 
     BookDeleteDTO, BookVO
 from app.service.book_service import BookService
 from app.core.constants import SuccessMsg
+from app.service.user_service import UserService
 
 book_router = APIRouter(prefix="/book", tags=["图书百科模块"])
 
@@ -64,6 +66,20 @@ def favorite_book(
     """收藏书籍/修改阅读状态 (支持取消收藏)"""
     service.favorite_book(dto, current_user)
     return Result.success(message=SuccessMsg.ACTION_SUCCESS)
+
+@book_router.post("/get_favorites")
+def get_favorites(
+    user_id: int =Query(..., description="查询的用户id"),
+    service: BookService = Depends(),
+    user_service: UserService = Depends()
+):
+    ids = service.get_favorite_books(user_id)
+    book_vo_list = []
+    for book_id in ids:
+        target_user = user_service.get_user_profile(user_id, None)
+        book_vo = service.get_book_detail(book_id, False, target_user)
+        book_vo_list.append(book_vo)
+    return Result.success(data=book_vo_list, message=SuccessMsg.GET_FAV_BOOKS_SUCCESS)
 
 @book_router.post("/create")
 def create_book(
