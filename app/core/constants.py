@@ -54,6 +54,9 @@ class ActionWeight:
     POST = 4.0       # 为书发帖
     COMMENT = 2.0    # 在书籍相关帖子下评论
 
+class RecommendValue:
+    DECAY_CONSTANT = 0.95
+
 
 class PromptTemplates:
     """

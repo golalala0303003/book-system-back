@@ -2,6 +2,7 @@ from sqlmodel import Session, select
 from app.models.user import User
 from app.recommend.vector_utils import VectorConverter
 from app.recommend.matrix_cache import book_matrix_cache
+from app.core.constants import RecommendValue
 
 
 
@@ -26,6 +27,10 @@ class UserInterestService:
             return
 
         user_vector_dict = VectorConverter.str_to_dict(user.feature_vector)
+
+        # 对之前的特征向量进行衰减
+        for tag_index in user_vector_dict:
+            user_vector_dict[tag_index] *= RecommendValue.DECAY_CONSTANT
 
         # 兴趣累加计算：User_New = User_Old + (Book_Vector * Weight)
         for tag_index, tfidf_val in book_vector.items():

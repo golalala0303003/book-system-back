@@ -32,6 +32,8 @@ class BookService:
             if current_user:
                 # 浏览历史记录
                 self.dao.record_browse_history(current_user.id, book_id)
+
+                # 推荐系统埋点
                 UserInterestService.update_user_interest(
                     self.dao.db,
                     current_user.id,
@@ -109,6 +111,15 @@ class BookService:
                 book.upvote_count += 1
             else:
                 book.downvote_count += 1
+
+            # 用户首次点赞/点踩将会记录爱好 推荐系统埋点
+            UserInterestService.update_user_interest(
+                self.dao.db,
+                current_user.id,
+                book.id,
+                ActionWeight.UPVOTE * dto.vote_type
+            )
+
         else:
             # 场景 B: 修改或取消
             if existing_vote.vote_type == dto.vote_type:
@@ -151,6 +162,14 @@ class BookService:
             new_fav = BookFavorite(user_id=current_user.id, book_id=dto.book_id, status=dto.status)
             self.dao.db.add(new_fav)
             book.favorite_count += 1
+
+            # 用户首次收藏 推荐系统埋点
+            UserInterestService.update_user_interest(
+                self.dao.db,
+                current_user.id,
+                book.id,
+                ActionWeight.COLLECT
+            )
         else:
             # 场景 B: 已经收藏过了
             if dto.status == 0 or existing_fav.status == dto.status:
@@ -310,7 +329,7 @@ class BookService:
         """
         获取个性化书籍推荐
         """
-        # TODO 这个我们后续通过别的方式解决 拦截冷启动 (新注册用户，没有任何行为数据)
+        # 这种情况较为少见，用户首次登录系统的时候将会被迫选择一些tag或者书籍,但是保留应对措施
         if not current_user or not current_user.feature_vector:
             hot_books = self.dao.get_hot_books(limit)
             return [BookVO.model_validate(b) for b in hot_books]
@@ -323,6 +342,7 @@ class BookService:
             return [BookVO.model_validate(b) for b in hot_books]
 
         # normalized_user 格式: {tag_index: ln(1 + raw_score)}
+        # 进行对数标准化
         normalized_user = VectorConverter.log_normalize(user_vector_dict)
 
         # 矩阵相乘 (稀疏向量点乘)
@@ -336,7 +356,6 @@ class BookService:
                 if tag_index in book_vector:
                     score += user_val * book_vector[tag_index]
 
-            # TODO 这里要剔除用户阅读过的书籍,并且做随机推荐
             if score > 0:
                 book_scores.append((book_id, score))
 
