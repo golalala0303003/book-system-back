@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     ALIYUN_ACCESSKEY_SECRET: str
     ALIYUN_ENDPOINT: str
 
+    # 大模型配置
+    LLM_API_KEY: str
+    LLM_BASE_URL: str
+    LLM_MODEL_NAME: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

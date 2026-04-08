@@ -1,4 +1,5 @@
 class ErrorMsg:
+    LLM_NOT_AVAILABLE = "大模型目前不可用"
     BOOK_ALREADY_EXISTS = "该书已经存在，请勿重复添加"
     USER_ALREADY_EXISTS = "该用户名已被注册，请更换一个"
     INVALID_CREDENTIALS = "用户名或密码错误"
@@ -52,3 +53,35 @@ class ActionWeight:
     COLLECT = 5.0    # 收藏/正在读
     POST = 4.0       # 为书发帖
     COMMENT = 2.0    # 在书籍相关帖子下评论
+
+
+class PromptTemplates:
+    """
+    大模型提示词
+    """
+
+    # 图书科普/问答 系统提示词
+    BOOK_KNOWLEDGE_SYSTEM_PROMPT = """你是一个专业的图书推荐官和阅读顾问。
+当前用户正在浏览以下书籍的详情：
+《{title}》
+作者：{author}
+出版社：{publisher}
+出版年：{publish_year}
+豆瓣评分：{douban_rating}
+标签：{tags}
+内容简介：{summary}
+
+请根据以上书籍信息，回答用户的提问。
+要求：
+1. 结合书籍内容，回答客观、专业、有针对性。
+2. 如果用户的提问与该书无关，请委婉地引导回当前图书相关话题。
+3. 语言风格自然，排版清晰易读。"""
+
+    @classmethod
+    def build_book_system_prompt(cls, book: dict) -> str:
+        """
+        构建图书专属的系统提示词
+        """
+        # 使用 safe_dict 处理可能的 None 值，防止格式化报错
+        safe_dict = {k: (v if v is not None else "未知") for k, v in book.items()}
+        return cls.BOOK_KNOWLEDGE_SYSTEM_PROMPT.format(**safe_dict)
