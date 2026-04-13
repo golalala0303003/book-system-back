@@ -9,6 +9,8 @@ from app.models import User
 from app.recommend.matrix_cache import book_matrix_cache
 from app.recommend.vector_utils import VectorConverter
 
+import json
+
 
 class AIService:
     def __init__(
@@ -38,8 +40,18 @@ class AIService:
         full_messages.extend(user_messages)  # 将前端传来的历史记录和当前问题追加进去
 
         # 调用 LLM 工具类，返回流式生成器
-        async for chunk in self.llm_client.stream_chat(full_messages, enable_search):
-            yield chunk
+        try:
+            async for chunk in self.llm_client.stream_chat(full_messages, enable_search):
+                if chunk:
+                    payload = json.dumps(
+                        {"content": chunk},
+                            ensure_ascii=False
+                    )
+                    yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            error_payload = json.dumps({"error": str(e)}, ensure_ascii=False)
+            yield f"event: error\ndata: {error_payload}\n\n"
 
     async def get_recommend_reason_stream(self, book_id: int, current_user: User) -> AsyncGenerator[str, None]:
         """
@@ -77,8 +89,6 @@ class AIService:
                     # 3. 反向解析获取中文标签名称
                     matching_tag_names = self.book_dao.get_tag_names_by_indices(top_3_indices)
 
-        import pprint
-        pprint.pprint(matching_tag_names)
 
         # 4. 构建专门的 Prompt
         system_content = PromptTemplates.build_book_recommend_reason_prompt(
@@ -89,6 +99,15 @@ class AIService:
         # 5. 组装 Message 并调用流式返回 (无需历史记录)
         messages = [{"role": "user", "content": system_content}]
 
-        # 推荐语不需要开启联网搜索，固定传 False 即可
-        async for chunk in self.llm_client.stream_chat(messages, enable_search=False):
-            yield chunk
+        try:
+            async for chunk in self.llm_client.stream_chat(messages, enable_search=False):
+                if chunk:
+                    payload = json.dumps(
+                        {"content": chunk},
+                            ensure_ascii=False
+                    )
+                    yield f"data: {payload}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            error_payload = json.dumps({"error": str(e)}, ensure_ascii=False)
+            yield f"event: error\ndata: {error_payload}\n\n"
