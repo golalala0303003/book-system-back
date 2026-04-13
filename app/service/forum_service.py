@@ -190,8 +190,8 @@ class ForumService:
         return PageData(total=total, page=dto.page, size=dto.size, records=vo_list)
 
 
-    def get_browse_books(self, user_id):
-        ids = self.dao.get_post_browse_ids(user_id)
+    def get_browse_post_record(self, user_id, page, size):
+        total, ids = self.dao.get_post_browse_ids(user_id, page, size)
         vo_list = []
         for post_id in ids:
             post = self.dao.get_post_by_id(post_id)
@@ -199,7 +199,7 @@ class ForumService:
             post_vo.content = utils.extract_summary(post_vo.content, 30)
             vo_list.append(post_vo)
 
-        return vo_list
+        return total, vo_list
 
 
     def update_post(self, dto: PostUpdateDTO, current_user: User) -> PostVO:

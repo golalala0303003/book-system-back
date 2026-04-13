@@ -134,6 +134,15 @@ class ForumDao:
 
         return total, records
 
+    def get_post_browse_ids(self, user_id, page, size):
+        statement = select(PostBrowseHistory.post_id).where(PostBrowseHistory.user_id == user_id).order_by(PostBrowseHistory.last_view_time.desc())
+
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = self.db.exec(count_statement).one()
+
+        statement = statement.offset((page - 1) * size).limit(size)
+        return total, self.db.exec(statement).all()
+
     # ---------------- 评论相关 ----------------
     def get_comment_by_id(self, comment_id: int) -> Comment | None:
         statement = select(Comment).where(Comment.id == comment_id, Comment.is_deleted == False)
@@ -274,7 +283,3 @@ class ForumDao:
             self.db.add(new_history)
 
         self.db.commit()
-
-    def get_post_browse_ids(self, user_id):
-        statement = select(PostBrowseHistory.post_id).where(PostBrowseHistory.user_id == user_id).order_by(PostBrowseHistory.last_view_time.desc())
-        return self.db.exec(statement).all()

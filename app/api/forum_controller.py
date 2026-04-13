@@ -145,16 +145,19 @@ def get_post_page(
 @post_router.get("/history")
 def get_post_browse_history(
         user_id: int = Query(..., description="要查询的用户id"),
+        page: int = Query(..., description="页码"),
+        size: int = Query(..., description="每页页数"),
         forum_service: ForumService = Depends(),
         book_service: BookService = Depends(),
         user_service: UserService = Depends()
 ):
-    posts = forum_service.get_browse_books(user_id)
+    total, posts = forum_service.get_browse_post_record(user_id, page, size)
     for post in posts:
         post.user = user_service.get_user_profile(post.user_id, None)
         if post.book_id:
             post.book = book_service.get_book_detail(post.book_id, False, None)
-    return Result.success(data=posts, message="获取浏览记录成功")
+    page_data = PageData(total=total, page=page, size=size, records=posts)
+    return Result.success(data=page_data, message="获取浏览记录成功")
 
 @post_router.post("/update")
 def update_post(
@@ -219,7 +222,7 @@ def vote_comment(
     return Result.success(message=SuccessMsg.ACTION_SUCCESS)
 
 
-@post_router.post("/recommend/page", response_model=Result[PageData[PostVO]])
+@post_router.get("/recommend/page", response_model=Result[PageData[PostVO]])
 def get_recommend_posts_page(
     page: int = Query(default=1, ge=1, description="当前页码"),
     size: int = Query(default=10, ge=1, le=50, description="每页条数"),
