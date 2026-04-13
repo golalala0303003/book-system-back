@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from app.api import user_controller, ai_controller
+from app.api import user_controller, ai_controller, admin_controller
 from app.api import upload_controller
 from app.api import forum_controller
 from app.api import book_controller
@@ -50,6 +50,7 @@ app.include_router(forum_controller.post_router)
 app.include_router(forum_controller.comment_router)
 app.include_router(book_controller.book_router)
 app.include_router(ai_controller.ai_router)
+app.include_router(admin_controller.admin_router)
 
 register_exception_handlers(app)
 

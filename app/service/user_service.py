@@ -2,8 +2,11 @@ from typing import Optional
 
 from sqlmodel import Session
 
-from app.exceptions.user_exceptions import UserNotFoundException, IncorrectPasswordException, UserAlreadyExistsException
-from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserUpdateDTO, UserInfoVO, UserStatsVO
+from app.exceptions.user_exceptions import UserNotFoundException, IncorrectPasswordException, \
+    UserAlreadyExistsException, UserNotAllowedException
+from app.schemas.result import PageData
+from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserUpdateDTO, UserInfoVO, UserStatsVO, \
+    UserAdminVO, UserAdminQueryDTO, UserStatusUpdateDTO
 from app.models.user import User
 from app.dao.user_dao import UserDao
 from app.core.security import get_password_hash, verify_password, create_access_token
@@ -112,3 +115,38 @@ class UserService:
 
         # 3. 字典解包并组装为响应 VO
         return UserStatsVO(**stats_dict)
+
+    def get_admin_user_page(self, query_dto: UserAdminQueryDTO) -> PageData[UserAdminVO]:
+        """
+        [管理端] 获取用户分页列表
+        """
+        # 1. 调 DAO 查数据
+        total, records = self.dao.get_users_page_for_admin(query_dto)
+
+        # 2. 实体转 VO
+        vo_list = [UserAdminVO.model_validate(user) for user in records]
+
+        # 3. 组装标准分页响应体
+        return PageData(
+            total=total,
+            page=query_dto.page,
+            size=query_dto.size,
+            records=vo_list
+        )
+
+    def update_user_status(self, user_id: int, update_dto: UserStatusUpdateDTO) -> None:
+        """
+        [管理端] 封禁或解封用户
+        """
+        # 1. 查出目标用户
+        target_user = self.dao.get_user_by_id(user_id)
+        if not target_user:
+            raise UserNotFoundException()  # 或者 raise HTTPException(status_code=404, detail="用户不存在")
+
+        # 2. 安全防御：禁止封禁管理员账号
+        if target_user.role == "admin" and not update_dto.is_active:
+            raise UserNotAllowedException()
+
+        # 3. 更新状态并保存
+        target_user.is_active = update_dto.is_active
+        self.dao.update_user(target_user)

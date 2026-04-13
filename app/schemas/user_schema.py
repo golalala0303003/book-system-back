@@ -63,3 +63,26 @@ class UserStatsVO(BaseModel):
     received_upvote_count: int = Field(default=0, description="发布的所有帖子与评论累计获得的总赞数")
     viewed_post_count: int = Field(default=0, description="浏览过的帖子总数")
     comment_count: int = Field(default=0, description="参与评论的总数")
+
+class UserAdminQueryDTO(BaseModel):
+    """管理员查询用户列表参数"""
+    page: int = Field(default=1, ge=1, description="当前页码")
+    size: int = Field(default=10, ge=1, le=100, description="每页数量")
+    keyword: Optional[str] = Field(default=None, description="搜索用户名(模糊匹配)")
+    is_active: Optional[bool] = Field(default=None, description="账号状态：True正常，False封禁，不传则查全部")
+
+class UserAdminVO(BaseModel):
+    """管理端展示的用户信息"""
+    id: int
+    username: str
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    role: str
+    is_active: bool  # 管理员必须看到状态
+    create_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class UserStatusUpdateDTO(BaseModel):
+    """管理员更新用户状态参数"""
+    is_active: bool = Field(description="目标状态：True为解封，False为封禁")

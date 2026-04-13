@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.constants import ErrorMsg
 from app.core.security import decode_access_token
 from app.dao.user_dao import UserDao
-from app.exceptions.user_exceptions import AuthFailedException
+from app.exceptions.user_exceptions import AuthFailedException, UserNotAllowedException
 from app.models.user import User
 from typing import Optional
 
@@ -35,6 +35,9 @@ def get_current_user(
     if not user:
         raise AuthFailedException(detail=ErrorMsg.USER_NOT_FOUND)
 
+    if not user.is_active:
+        raise AuthFailedException(detail=ErrorMsg.USER_BAN)
+
     # 4. 鉴权通过，返回该用户对象
     return user
 
@@ -62,4 +65,18 @@ def get_current_user_optional(
 
     # 查库
     user = user_dao.get_user_by_id(int(user_id_str))
+
+    if user and not user.is_active:
+        return None
+
     return user
+
+def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    """
+    管理员专属鉴权拦截器
+    用法：在需要管理员权限的接口参数中写 admin_user: User = Depends(get_current_admin)
+    """
+    # 会先跑一次 get_current_user 逻辑
+    if current_user.role != "admin":
+        raise UserNotAllowedException()
+    return current_user

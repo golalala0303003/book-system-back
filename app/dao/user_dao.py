@@ -4,6 +4,8 @@ from fastapi import Depends
 from app.core.db import get_db
 from app.models.forum import Post, Comment, PostBrowseHistory
 from app.models.book import BookFavorite
+from app.schemas.user_schema import UserAdminQueryDTO
+
 
 class UserDao:
     def __init__(self, db: Session = Depends(get_db)):
@@ -84,3 +86,27 @@ class UserDao:
             "viewed_post_count": viewed_post_count,
             "comment_count": comment_count
         }
+
+    def get_users_page_for_admin(self, dto: UserAdminQueryDTO) -> tuple[int, list[User]]:
+        """
+        [管理端] 分页条件查询用户列表
+        """
+        statement = select(User)
+
+        # 1. 动态拼接条件
+        if dto.keyword:
+            statement = statement.where(User.username.like(f"%{dto.keyword}%"))
+
+        if dto.is_active is not None:
+            statement = statement.where(User.is_active == dto.is_active)
+
+        # 2. 统计符合条件的总数
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = self.db.exec(count_statement).one()
+
+        # 3. 按注册时间倒序排，并进行分页
+        statement = statement.order_by(User.create_time.desc())
+        statement = statement.offset((dto.page - 1) * dto.size).limit(dto.size)
+
+        records = self.db.exec(statement).all()
+        return total, records
