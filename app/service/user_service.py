@@ -3,7 +3,7 @@ from typing import Optional
 from sqlmodel import Session
 
 from app.exceptions.user_exceptions import UserNotFoundException, IncorrectPasswordException, UserAlreadyExistsException
-from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserUpdateDTO, UserInfoVO
+from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserUpdateDTO, UserInfoVO, UserStatsVO
 from app.models.user import User
 from app.dao.user_dao import UserDao
 from app.core.security import get_password_hash, verify_password, create_access_token
@@ -97,3 +97,18 @@ class UserService:
                 user_info.email = "***"
 
         return user_info
+
+    def get_user_stats(self, user_id: int) -> UserStatsVO:
+        """
+        获取用户公开的统计面板数据
+        """
+        # 1. 严格校验用户有效性
+        user = self.dao.get_user_by_id(user_id)  # 假设你 UserDao 有这个基础查询方法
+        if not user:
+            raise UserNotFoundException()
+
+        # 2. 调用 DAO 执行底层聚合
+        stats_dict = self.dao.get_user_statistics(user_id)
+
+        # 3. 字典解包并组装为响应 VO
+        return UserStatsVO(**stats_dict)

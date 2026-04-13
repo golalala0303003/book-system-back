@@ -4,7 +4,7 @@ from app.core.constants import SuccessMsg
 from app.dependencies import get_current_user, get_current_user_optional
 from app.models import User
 from app.schemas.result import Result
-from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserInfoVO, UserUpdateDTO
+from app.schemas.user_schema import UserRegisterDTO, UserLoginDTO, UserLoginVO, UserInfoVO, UserUpdateDTO, UserStatsVO
 from app.service.user_service import UserService
 
 
@@ -53,3 +53,15 @@ def update_user(
     """
     user_info = service.update_user(current_user, update_dto)
     return Result.success(data=user_info, message=SuccessMsg.UPDATE_USER_SUCCESS)
+
+@router.get("/{user_id}/stats", response_model=Result[UserStatsVO])
+def get_user_stats(
+    user_id: int,
+    service: UserService = Depends()
+):
+    """
+    获取指定用户的各项公开统计数据 (发帖、评论、获赞等)
+    无需登录，公开可查
+    """
+    stats_vo = service.get_user_stats(user_id)
+    return Result.success(data=stats_vo, message="获取用户统计数据成功")

@@ -55,3 +55,11 @@ class UserUpdateDTO(BaseModel):
         if not self.model_dump(exclude_unset=True):
             raise AtLeastOneFieldException()
         return self
+
+
+class UserStatsVO(BaseModel):
+    post_count: int = Field(default=0, description="发帖总数量")
+    favorite_book_count: int = Field(default=0, description="收藏/阅读的图书总数")
+    received_upvote_count: int = Field(default=0, description="发布的所有帖子与评论累计获得的总赞数")
+    viewed_post_count: int = Field(default=0, description="浏览过的帖子总数")
+    comment_count: int = Field(default=0, description="参与评论的总数")
