@@ -3,8 +3,10 @@ from fastapi import APIRouter, Depends
 from app.core.constants import SuccessMsg
 from app.dependencies import get_current_user, get_current_user_optional, get_current_admin
 from app.models import User
+from app.schemas.book_schema import BookAdminQueryDTO, BookAdminVO, BookStatusUpdateDTO, BookCreateDTO, BookUpdateDTO
 from app.schemas.result import Result, PageData
 from app.schemas.user_schema import UserAdminVO, UserAdminQueryDTO, UserStatusUpdateDTO
+from app.service.book_service import BookService
 from app.service.user_service import UserService
 
 
@@ -38,3 +40,51 @@ def update_user_status(
 
     action_msg = "解封" if status_dto.is_active else "封禁"
     return Result.success(message=f"用户{action_msg}操作成功")
+
+@admin_router.post("/book/page", response_model=Result[PageData[BookAdminVO]])
+def get_book_page_for_admin(
+    query_dto: BookAdminQueryDTO,
+    admin_user: User = Depends(get_current_admin),
+    service: BookService = Depends()
+):
+    """
+    [管理端] 分页获取图书列表 (支持按书名、状态筛选)
+    """
+    page_data = service.get_admin_book_page(query_dto)
+    return Result.success(data=page_data, message="获取图书列表成功")
+
+
+@admin_router.post("/book/{book_id}/status", response_model=Result)
+def update_book_status(
+        book_id: int,
+        status_dto: BookStatusUpdateDTO,
+        admin_user: User = Depends(get_current_admin),
+        service: BookService = Depends()
+):
+    """
+    [管理端] 调整图书上架/下架状态
+    """
+    service.update_book_status(book_id, status_dto)
+
+    action_msg = "上架" if status_dto.is_active else "下架"
+    return Result.success(message=f"图书{action_msg}操作成功")
+
+@admin_router.post("/book/create")
+def create_book(
+    dto: BookCreateDTO,
+    current_user: User = Depends(get_current_admin),
+    service: BookService = Depends()
+):
+    """人工录入新书 (仅限管理员)"""
+    book_vo = service.create_book(dto, current_user)
+    return Result.success(data=book_vo, message="书籍录入成功")
+
+@admin_router.post("/book/update")
+def update_book(
+    dto: BookUpdateDTO,
+    current_user: User = Depends(get_current_admin),
+    service: BookService = Depends()
+):
+    """修改书籍信息 (仅限管理员，支持部分字段更新)"""
+    book_vo = service.update_book(dto, current_user)
+    return Result.success(data=book_vo, message="书籍修改成功")

@@ -11,7 +11,7 @@ from app.models.user import User
 from app.recommend.interest_service import UserInterestService
 from app.recommend.matrix_cache import book_matrix_cache
 from app.schemas.book_schema import BookQueryDTO, BookVO, BookVoteDTO, BookFavoriteDTO, BookCreateDTO, BookUpdateDTO, \
-    BookSuggestVO
+    BookSuggestVO, BookAdminQueryDTO, BookAdminVO, BookStatusUpdateDTO
 from app.schemas.result import PageData
 from sklearn.feature_extraction.text import TfidfVectorizer
 from app.recommend.vector_utils import VectorConverter
@@ -463,3 +463,32 @@ class BookService:
             print(f"{rank:<6} | {b_id:<10} | {true_cosine:<18.6f} | {raw_dot_score:<15.6f}")
 
         print("=" * 60 + "\n")
+
+    def get_admin_book_page(self, query_dto: BookAdminQueryDTO) -> PageData[BookAdminVO]:
+        """
+        [管理端] 获取图书分页列表
+        """
+        # 调 DAO 查数据
+        total, records = self.dao.get_books_page_for_admin(query_dto)
+        vo_list = [BookAdminVO.model_validate(book) for book in records]
+
+        # 组装
+        return PageData(
+            total=total,
+            page=query_dto.page,
+            size=query_dto.size,
+            records=vo_list
+        )
+
+    def update_book_status(self, book_id: int, update_dto: BookStatusUpdateDTO) -> None:
+        """
+        [管理端] 调整图书上下架状态
+        """
+        # 查出目标图书
+        target_book = self.dao.get_book_by_id_for_admin(book_id)
+        if not target_book:
+            raise BookNotExistsException()
+
+        # 更新状态并保存
+        target_book.is_active = update_dto.is_active
+        self.dao.update_book(target_book)

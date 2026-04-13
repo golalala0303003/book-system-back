@@ -86,3 +86,27 @@ class BookUpdateDTO(BaseModel):
 
 class BookDeleteDTO(BaseModel):
     book_id: int = Field(..., description="要下架的书籍ID")
+
+class BookAdminQueryDTO(BaseModel):
+    """管理员查询图书列表参数"""
+    page: int = Field(default=1, ge=1, description="当前页码")
+    size: int = Field(default=10, ge=1, le=100, description="每页条数")
+    keyword: Optional[str] = Field(default=None, description="搜索书名/作者/ISBN")
+    is_active: Optional[bool] = Field(default=None, description="上架状态: True已上架, False已下架, 不传查全部")
+
+class BookAdminVO(BaseModel):
+    """管理端展示的图书简要信息"""
+    id: int
+    douban_id: str
+    title: str
+    author: Optional[str] = None
+    isbn: Optional[str] = None
+    is_active: bool  # 核心字段：管理员必须看到是否上下架
+    view_count: int
+    create_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class BookStatusUpdateDTO(BaseModel):
+    """管理员更新图书上下架状态参数"""
+    is_active: bool = Field(description="目标状态：True为上架，False为下架")

@@ -86,26 +86,6 @@ def get_favorites(
     page_data = PageData(total=total, page=page, size=size, records=book_vo_list)
     return Result.success(data=page_data, message=SuccessMsg.GET_FAV_BOOKS_SUCCESS)
 
-@book_router.post("/create")
-def create_book(
-    dto: BookCreateDTO,
-    current_user: User = Depends(get_current_user),
-    service: BookService = Depends()
-):
-    """人工录入新书 (仅限管理员)"""
-    book_vo = service.create_book(dto, current_user)
-    return Result.success(data=book_vo, message="书籍录入成功")
-
-@book_router.post("/update")
-def update_book(
-    dto: BookUpdateDTO,
-    current_user: User = Depends(get_current_user),
-    service: BookService = Depends()
-):
-    """修改书籍信息 (仅限管理员，支持部分字段更新)"""
-    book_vo = service.update_book(dto, current_user)
-    return Result.success(data=book_vo, message="书籍修改成功")
-
 @book_router.post("/delete")
 def delete_book(
     dto: BookDeleteDTO,

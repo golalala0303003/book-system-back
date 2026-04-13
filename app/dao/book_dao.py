@@ -3,7 +3,7 @@ from sqlmodel import Session, select, func, or_, col
 from fastapi import Depends
 from app.core.db import get_db
 from app.models.book import Book, BookBrowseHistory, BookVote, BookFavorite, TagIndex  # 假设你的实体在这个路径
-from app.schemas.book_schema import BookQueryDTO
+from app.schemas.book_schema import BookQueryDTO, BookAdminQueryDTO
 
 
 class BookDao:
@@ -193,7 +193,7 @@ class BookDao:
 
     def get_all_books_with_tags(self) -> list[Book]:
         """获取所有带有标签的书籍"""
-        statement = select(Book).where(Book.tags is not None)
+        statement = select(Book).where(Book.tags is not None, Book.is_active == True)
         return self.db.exec(statement).all()
 
     def commit_changes(self):
@@ -204,12 +204,12 @@ class BookDao:
         """根据 ID 列表批量查询书籍"""
         if not book_ids:
             return []
-        statement = select(Book).where(col(Book.id).in_(book_ids))
+        statement = select(Book).where(col(Book.id).in_(book_ids), Book.is_active == True)
         return self.db.exec(statement).all()
 
     def get_hot_books(self, limit: int = 10) -> list[Book]:
         """获取全站热门书籍 (按浏览量或收藏量降序，用于冷启动)"""
-        statement = select(Book).order_by(Book.view_count.desc()).limit(limit)
+        statement = select(Book).where(Book.is_active == True).order_by(Book.view_count.desc()).limit(limit)
         return self.db.exec(statement).all()
 
     def get_tag_names_by_indices(self, indices: list[int]) -> list[str]:
@@ -219,3 +219,44 @@ class BookDao:
         # col() 是 sqlmodel 处理 in_ 的标准写法
         statement = select(TagIndex.tag_name).where(col(TagIndex.index_value).in_(indices))
         return self.db.exec(statement).all()
+
+    def get_books_page_for_admin(self, dto: BookAdminQueryDTO) -> tuple[int, list[Book]]:
+        """
+        [管理端] 分页条件查询图书列表 (包含已下架的图书)
+        """
+        statement = select(Book)
+
+        # 1. 动态拼接条件
+        if dto.keyword:
+            search_str = f"%{dto.keyword}%"
+            statement = statement.where(
+                or_(
+                    Book.title.like(search_str),
+                    Book.author.like(search_str),
+                    Book.isbn.like(search_str)
+                )
+            )
+
+        # 核心逻辑：根据传入状态过滤，如果不传则查全部
+        if dto.is_active is not None:
+            statement = statement.where(Book.is_active == dto.is_active)
+
+        # 2. 统计符合条件的总数
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = self.db.exec(count_statement).one()
+
+        # 3. 按入库时间倒序排
+        statement = statement.order_by(Book.create_time.desc())
+
+        # 4. 分页提取
+        statement = statement.offset((dto.page - 1) * dto.size).limit(dto.size)
+        records = self.db.exec(statement).all()
+
+        return total, records
+
+    def get_book_by_id_for_admin(self, book_id: int) -> Book | None:
+        """
+        [管理端] 根据ID获取图书详情 (无视上下架状态，专供管理端使用)
+        """
+        statement = select(Book).where(Book.id == book_id)
+        return self.db.exec(statement).first()
