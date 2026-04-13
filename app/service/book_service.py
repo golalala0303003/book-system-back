@@ -15,7 +15,7 @@ from app.schemas.book_schema import BookQueryDTO, BookVO, BookVoteDTO, BookFavor
 from app.schemas.result import PageData
 from sklearn.feature_extraction.text import TfidfVectorizer
 from app.recommend.vector_utils import VectorConverter
-
+import math
 
 class BookService:
     def __init__(self, dao: BookDao = Depends()):
@@ -366,6 +366,9 @@ class BookService:
 
         # 按得分从高到低排序
         book_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # self.debug_print_true_cosine(normalized_user, book_scores)
+
         top_book_ids = [book_id for book_id, score in book_scores[:limit]]
 
         # 从数据库获取实体数据
@@ -425,5 +428,38 @@ class BookService:
 
         return [BookVO.model_validate(b) for b in sorted_books]
 
-    def get_favorite_books(self, user_id):
-        return self.dao.get_all_favorite_books_by_id(user_id)
+    def get_favorite_books(self, user_id, page, size, status):
+        return self.dao.get_favorite_books_page_by_id(user_id, page, size, status)
+
+    def debug_print_true_cosine(self, normalized_user: dict, book_scores_list: list):
+        """
+        基于已归一化的书籍向量，还原并打印真实的余弦相似度
+        normalized_user: {tag_index: user_weight}
+        book_scores_list: list of tuples, e.g., [(book_id, raw_dot_product_score), ...]
+        """
+        if not book_scores_list or not normalized_user:
+            return
+
+        # 1. 计算用户向量的 L2 范数 (||U||)
+        user_norm = math.sqrt(sum(val ** 2 for val in normalized_user.values()))
+
+        if user_norm == 0:
+            print("[-] 用户向量全为0，无法计算标准余弦。")
+            return
+
+        print("\n" + "=" * 60)
+        print(f"📊 论文数据采集: Top 50 真实余弦相似度 (Cosine Sim)")
+        print(f"📌 用户向量长度 (||U||): {user_norm:.4f}")
+        print("=" * 60)
+        print(f"{'Rank':<6} | {'Book ID':<10} | {'Cosine Sim [0,1]':<18} | {'Raw Dot Product':<15}")
+        print("-" * 60)
+
+        # 截取前 50 名
+        top_50 = book_scores_list[:50]
+
+        for rank, (b_id, raw_dot_score) in enumerate(top_50, 1):
+            # 2. 还原真实余弦值：点积 / (||U|| * 1)
+            true_cosine = raw_dot_score / user_norm
+            print(f"{rank:<6} | {b_id:<10} | {true_cosine:<18.6f} | {raw_dot_score:<15.6f}")
+
+        print("=" * 60 + "\n")

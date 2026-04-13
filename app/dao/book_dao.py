@@ -124,11 +124,30 @@ class BookDao:
         favorites = self.db.exec(statement).all()
         return {f.book_id: f.status for f in favorites}
 
+    def get_favorite_books_page_by_id(self, user_id, page, size, status):
+        # 基础条件
+        conditions = [BookFavorite.user_id == user_id]
 
-    def get_all_favorite_books_by_id(self, user_id):
-        statement = select(BookFavorite.book_id).where(BookFavorite.user_id == user_id).order_by(BookFavorite.create_time)
+        # 只有 status != 0 才加过滤
+        if status != 0:
+            conditions.append(BookFavorite.status == status)
+
+        # 构造查询
+        statement = (
+            select(BookFavorite.book_id)
+            .where(*conditions)
+            .order_by(BookFavorite.create_time)
+        )
+
+        # count
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = self.db.exec(count_statement).one()
+
+        # 分页
+        statement = statement.offset((page - 1) * size).limit(size)
         ids = self.db.exec(statement).all()
-        return ids
+
+        return total, ids
 
     def get_book_by_douban_id(self, douban_id: str) -> Book | None:
         """根据豆瓣ID查询书籍 (包含已下架的，防止重复录入)"""

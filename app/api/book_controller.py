@@ -6,7 +6,7 @@ from sqlalchemy import false
 
 from app.models.user import User
 from app.dependencies import get_current_user_optional, get_current_user
-from app.schemas.result import Result
+from app.schemas.result import Result, PageData
 from app.schemas.book_schema import BookQueryDTO, BookVoteDTO, BookFavoriteDTO, BookCreateDTO, BookUpdateDTO, \
     BookDeleteDTO, BookVO
 from app.service.book_service import BookService
@@ -67,19 +67,24 @@ def favorite_book(
     service.favorite_book(dto, current_user)
     return Result.success(message=SuccessMsg.ACTION_SUCCESS)
 
-@book_router.post("/get_favorites")
+@book_router.get("/get_favorites")
 def get_favorites(
     user_id: int =Query(..., description="查询的用户id"),
+    page: int = Query(..., description="页码"),
+    size: int = Query(..., description="每页页数"),
+    status: int = Query(..., description="查询状态"),
     service: BookService = Depends(),
     user_service: UserService = Depends()
 ):
-    ids = service.get_favorite_books(user_id)
+    """获得收藏的书籍"""
+    total, ids = service.get_favorite_books(user_id, page, size, status)
     book_vo_list = []
     for book_id in ids:
         target_user = user_service.get_user_profile(user_id, None)
         book_vo = service.get_book_detail(book_id, False, target_user)
         book_vo_list.append(book_vo)
-    return Result.success(data=book_vo_list, message=SuccessMsg.GET_FAV_BOOKS_SUCCESS)
+    page_data = PageData(total=total, page=page, size=size, records=book_vo_list)
+    return Result.success(data=page_data, message=SuccessMsg.GET_FAV_BOOKS_SUCCESS)
 
 @book_router.post("/create")
 def create_book(
