@@ -199,6 +199,11 @@ class ForumService:
             post_vo.content = utils.extract_summary(post_vo.content, 30)
             vo_list.append(post_vo)
 
+        post_ids = [vo.id for vo in vo_list]
+        vote_map = self.dao.get_user_post_votes_batch(user_id, post_ids)
+        for vo in vo_list:
+            vo.my_vote = vote_map.get(vo.id, 0)
+
         return total, vo_list
 
 
