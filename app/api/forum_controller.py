@@ -121,7 +121,7 @@ def get_post_detail(
     """查看帖子详情 (游客可用，附带浏览量+1)"""
     post_vo = forum_service.get_post_detail(post_id, record_view, current_user)
     if post_vo.book_id:
-        post_vo.book = book_service.get_book_detail(post_vo.book_id, False, current_user)
+        post_vo.book = book_service.get_book_detail_safe(post_vo.book_id, False, current_user)
     post_vo.user = user_service.get_user_profile(post_vo.user_id, current_user)
 
     return Result.success(data=post_vo, message=SuccessMsg.GET_POST_DETAIL_SUCCESS)
@@ -140,7 +140,7 @@ def get_post_page(
     for vo in page_data.records:
         vo.user = user_service.get_user_profile(vo.user_id, current_user)
         if vo.book_id:
-            vo.book = book_service.get_book_detail(vo.book_id, False, current_user)
+            vo.book = book_service.get_book_detail_safe(vo.book_id, False, current_user)
     return Result.success(data=page_data, message=SuccessMsg.POST_PAGE_SUCCESS)
 
 @post_router.get("/history")
@@ -156,7 +156,7 @@ def get_post_browse_history(
     for post in posts:
         post.user = user_service.get_user_profile(post.user_id, None)
         if post.book_id:
-            post.book = book_service.get_book_detail(post.book_id, False, None)
+            post.book = book_service.get_book_detail_safe(post.book_id, False, None)
     page_data = PageData(total=total, page=page, size=size, records=posts)
     return Result.success(data=page_data, message="获取浏览记录成功")
 
@@ -246,7 +246,7 @@ def get_recommend_posts_page(
     for vo in page_data.records:
         vo.user = user_service.get_user_profile(vo.user_id, current_user)
         if vo.book_id:
-            vo.book = book_service.get_book_detail(vo.book_id, False, current_user)
+            vo.book = book_service.get_book_detail_safe(vo.book_id, False, current_user)
 
     return Result.success(data=page_data, message="获取个性化帖子推荐成功")
 

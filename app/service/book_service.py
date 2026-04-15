@@ -57,6 +57,30 @@ class BookService:
 
         return vo
 
+    def get_book_detail_safe(self, book_id: int, record_view: bool, current_user: Optional[User]) -> BookVO | None:
+        """
+        [内部安全方法] 专用于其他模块的列表数据组装
+        """
+        book = self.dao.get_book_by_id(book_id)
+        if not book:
+            return None
+
+        vo = BookVO.model_validate(book)
+
+        # 为返回值添加用户的历史行为 (如果传入了用户)
+        if current_user:
+            # 查询点赞状态
+            vote = self.dao.get_book_vote(current_user.id, book_id)
+            if vote:
+                vo.my_vote = vote.vote_type
+
+            # 查询收藏/想读状态
+            favorite = self.dao.get_book_favorite(current_user.id, book_id)
+            if favorite:
+                vo.my_favorite_status = favorite.status
+
+        return vo
+
     def get_book_page(self, dto: BookQueryDTO, current_user: Optional[User]) -> PageData[BookVO]:
         total, records = self.dao.get_books_page(dto)
         vo_list = [BookVO.model_validate(b) for b in records]
