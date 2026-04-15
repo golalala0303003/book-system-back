@@ -31,6 +31,15 @@ class BookMatrixCache:
         self._vectors = new_cache
         return len(self._vectors)
 
+    def remove_vector(self, book_id: int):
+        """当书籍下架或逻辑删除时，从内存中剔除，防止被推荐"""
+        if book_id in self._vectors:
+            del self._vectors[book_id]
+
+    def update_vector(self, book_id: int, vector_dict: dict):
+        """当书籍重新上架或向量更新时，同步到内存"""
+        self._vectors[book_id] = vector_dict
+
     def get_all_vectors(self) -> dict[int, dict[int, float]]:
         """获取全量数据字典"""
         return self._vectors

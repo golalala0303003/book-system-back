@@ -492,3 +492,11 @@ class BookService:
         # 更新状态并保存
         target_book.is_active = update_dto.is_active
         self.dao.update_book(target_book)
+
+        # 通知缓存
+        if update_dto.is_active:
+            # 上架
+            vector_dict = VectorConverter.str_to_dict(target_book.tfidf_vector)
+            book_matrix_cache.update_vector(book_id, vector_dict)
+        else:
+            book_matrix_cache.remove_vector(book_id)

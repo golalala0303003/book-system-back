@@ -125,21 +125,25 @@ class BookDao:
         return {f.book_id: f.status for f in favorites}
 
     def get_favorite_books_page_by_id(self, user_id, page, size, status):
-        # 基础条件
-        conditions = [BookFavorite.user_id == user_id]
-
-        # 只有 status != 0 才加过滤
-        if status != 0:
-            conditions.append(BookFavorite.status == status)
-
-        # 构造查询
+        """获取用户的图书收藏分页并且过滤下架书籍"""
+        # 连表 Book
         statement = (
             select(BookFavorite.book_id)
-            .where(*conditions)
-            .order_by(BookFavorite.create_time)
+            .join(Book, BookFavorite.book_id == Book.id)
+            .where(
+                BookFavorite.user_id == user_id,
+                Book.is_active == True  # 核心防御：只查活着的书
+            )
         )
 
-        # count
+        # 状态过滤
+        if status != 0:
+            statement = statement.where(BookFavorite.status == status)
+
+        # 排序
+        statement = statement.order_by(BookFavorite.create_time.desc())
+
+        # total
         count_statement = select(func.count()).select_from(statement.subquery())
         total = self.db.exec(count_statement).one()
 
