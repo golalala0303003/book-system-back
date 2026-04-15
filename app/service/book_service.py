@@ -57,6 +57,13 @@ class BookService:
 
         return vo
 
+    def get_book_detail_for_admin(self, book_id):
+        book = self.dao.get_book_by_id_for_admin(book_id)
+        if not book:
+            raise BookNotExistsException()
+        vo = BookVO.model_validate(book)
+        return vo
+
     def get_book_detail_safe(self, book_id: int, record_view: bool, current_user: Optional[User]) -> BookVO | None:
         """
         [内部安全方法] 专用于其他模块的列表数据组装

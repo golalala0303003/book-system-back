@@ -59,6 +59,17 @@ def get_book_page_for_admin(
     page_data = book_service.get_admin_book_page(query_dto)
     return Result.success(data=page_data, message="获取图书列表成功")
 
+@admin_router.get("/detail/{book_id}")
+def get_book_detail(
+    book_id: int,
+    admin_user: User = Depends(get_current_admin),
+    service: BookService = Depends()
+):
+    """
+    [管理端] 获取图书的详细信息，书籍被下架后仍然可以查看
+    """
+    book_vo = service.get_book_detail_for_admin(book_id)
+    return Result.success(data=book_vo, message=SuccessMsg.GET_BOOK_DETAIL_SUCCESS)
 
 @admin_router.post("/book/{book_id}/status", response_model=Result)
 def update_book_status(
