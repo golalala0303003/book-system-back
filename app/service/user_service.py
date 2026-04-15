@@ -117,7 +117,7 @@ class UserService:
         # 3. 字典解包并组装为响应 VO
         return UserStatsVO(**stats_dict)
 
-    def get_admin_user_page(self, query_dto: UserAdminQueryDTO) -> PageData[UserAdminVO]:
+    def get_user_page_for_admin(self, query_dto: UserAdminQueryDTO) -> PageData[UserAdminVO]:
         """
         [管理端] 获取用户分页列表
         """

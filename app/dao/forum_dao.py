@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlmodel import Session, select, func, desc
 from fastapi import Depends
 from app.core.db import get_db
@@ -346,7 +348,7 @@ class ForumDao:
         ).order_by(Report.create_time.desc())
         return self.db.exec(stmt).all()
 
-    def update_reports_status_batch(self, target_type: str, target_id: int, new_status: int):
+    def update_reports_status_batch(self, target_type: str, target_id: int, new_status: int, remark: Optional[str] = None):
         """
         [管理端] 批量更新针对某一目标的待处理举报工单
         """
@@ -360,6 +362,8 @@ class ForumDao:
 
         for report in reports:
             report.status = new_status
+            if remark:
+                report.process_remark = remark
             self.db.add(report)
 
         # 这里先不 commit，由 Service 统一提交事务

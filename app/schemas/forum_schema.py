@@ -175,6 +175,7 @@ class ReportDetailVO(BaseModel):
     user_id: int
     reason: str
     create_time: datetime
+    process_remark: Optional[str] = Field(default=None, description="管理员处理备注")
 
     model_config = ConfigDict(from_attributes=True)
 

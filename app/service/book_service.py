@@ -504,7 +504,7 @@ class BookService:
             records=vo_list
         )
 
-    def update_book_status(self, book_id: int, update_dto: BookStatusUpdateDTO) -> None:
+    def update_book_status_for_admin(self, book_id: int, update_dto: BookStatusUpdateDTO) -> None:
         """
         [管理端] 调整图书上下架状态
         """

@@ -22,6 +22,9 @@ class Report(SQLModel, table=True):
     # 状态 0=待处理, 1=举报成立并已处理, 2=举报不成立已驳回
     status: int = Field(default=0, index=True, description="处理状态")
 
+    # 处理备注
+    process_remark: Optional[str] = Field(default=None, max_length=500, description="管理员的处理理由/驳回理由")
+
     # 时间
     create_time: datetime = Field(
         sa_column=Column(DateTime, server_default=func.now(), nullable=False)

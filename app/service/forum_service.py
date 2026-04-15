@@ -489,7 +489,7 @@ class ForumService:
         )
         self.forum_dao.create_report(new_report)
 
-    def get_admin_report_page(self, query_dto: ReportAdminQueryDTO) -> PageData[ReportAggregatedVO]:
+    def get_report_page(self, query_dto: ReportAdminQueryDTO) -> PageData[ReportAggregatedVO]:
         """获取聚合举报列表并拼装预览信息"""
         total, records = self.forum_dao.get_aggregated_reports_page(query_dto)
 
@@ -548,12 +548,12 @@ class ForumService:
             if target:
                 self.forum_dao.db.add(target)
 
-        # 2. 无论 action 是 1 还是 2，都要批量更新举报单状态
-        # 如果 action == 1，举报单设为 1 (成立)；如果 action == 2，举报单设为 2 (驳回)
+        # 无论 action 是 1 还是 2，都批量更新举报单状态
         self.forum_dao.update_reports_status_batch(
             target_type=dto.target_type,
             target_id=dto.target_id,
-            new_status=dto.action
+            new_status=dto.action,
+            remark=dto.remark
         )
 
         # 3. 统一提交事务
