@@ -283,5 +283,5 @@ class BookDao:
 
     def get_total_books(self) -> int:
         """获取总图书数"""
-        statement = select(func.count(Book.id))
+        statement = select(func.count(Book.id)).where(Book.is_active == True)
         return self.db.exec(statement).one()

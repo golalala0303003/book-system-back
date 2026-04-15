@@ -77,7 +77,15 @@ class ForumDao:
 
     # ---------------- 帖子相关 ----------------
     def get_post_by_id(self, post_id: int) -> Post | None:
-        statement = select(Post).where(Post.id == post_id, Post.is_deleted == False)
+        statement = (
+            select(Post)
+            .join(Board, Post.board_id == Board.id)
+            .where(
+                Post.id == post_id,
+                Post.is_deleted == False,
+                Board.is_active == True  # 核心拦截
+            )
+        )
         return self.db.exec(statement).first()
 
     def create_post(self, post: Post) -> Post:
@@ -103,7 +111,11 @@ class ForumDao:
     def get_posts_page(self, dto: "PostQueryDTO") -> tuple[int, list[Post]]:
         """复杂分页查询，返回 (总条数, 帖子列表)"""
         # 基础查询条件（排除已删除的）
-        statement = select(Post).where(Post.is_deleted == False)
+        statement = (
+            select(Post)
+            .join(Board, Post.board_id == Board.id)
+            .where(Post.is_deleted == False, Board.is_active == True)
+        )
 
         # 动态追加筛选条件
         if dto.board_id:
@@ -140,10 +152,12 @@ class ForumDao:
         """获取用户浏览记录的帖子ID，同时过滤掉已删除的帖子"""
         statement = (
             select(PostBrowseHistory.post_id)
-            .join(Post, PostBrowseHistory.post_id == Post.id)  # 关联帖子表
+            .join(Post, PostBrowseHistory.post_id == Post.id)
+            .join(Board, Post.board_id == Board.id)
             .where(
                 PostBrowseHistory.user_id == user_id,
-                Post.is_deleted == False
+                Post.is_deleted == False,
+                Board.is_active == True  # 拦截点
             )
             .order_by(PostBrowseHistory.last_view_time.desc())
         )
@@ -249,14 +263,23 @@ class ForumDao:
         统一推荐查询：优先展示 book_id 在推荐列表中的帖子，其次展示全站热门帖子，支持标准分页
         """
         # 1. 查询总条数 (就是全站所有未删除的帖子总数)
-        count_stmt = select(func.count()).select_from(Post).where(Post.is_deleted == False)
+        count_stmt = (
+            select(func.count())
+            .select_from(Post)
+            .join(Board, Post.board_id == Board.id)
+            .where(Post.is_deleted == False, Board.is_active == True)
+        )
         total = self.db.exec(count_stmt).one()
 
         # 2. 构建分页查询
-        statement = select(Post).where(Post.is_deleted == False)
+        statement = (
+            select(Post)
+            .join(Board, Post.board_id == Board.id)
+            .where(Post.is_deleted == False, Board.is_active == True)
+        )
 
         if book_ids:
-            # 核心魔法：构建一个虚拟的排序权重列
+            # 构建排序权重列
             # 如果帖子的 book_id 在推荐书单里，权重为 1，否则为 0
             is_recommended = case(
                 (Post.book_id.in_(book_ids), 1),
@@ -371,13 +394,31 @@ class ForumDao:
 
     def get_forum_stats(self) -> dict:
         """获取论坛相关统计数据"""
-        # 总帖子数 (排除逻辑删除)
-        post_count = self.db.exec(select(func.count(Post.id)).where(Post.is_deleted == False)).one()
-        # 总评论数 (排除逻辑删除)
-        comment_count = self.db.exec(select(func.count(Comment.id)).where(Comment.is_deleted == False)).one()
-        # 有效板块数
+        # 1. 总帖子数 (排除逻辑删除，且必须确保所属板块存活)
+        post_count_stmt = (
+            select(func.count(Post.id))
+            .join(Board, Post.board_id == Board.id)
+            .where(Post.is_deleted == False, Board.is_active == True)
+        )
+        post_count = self.db.exec(post_count_stmt).one()
+
+        # 2. 总评论数 (评论未删除 + 帖子未删除 + 板块未封禁)
+        comment_count_stmt = (
+            select(func.count(Comment.id))
+            .join(Post, Comment.post_id == Post.id)  # 找爸爸
+            .join(Board, Post.board_id == Board.id)  # 找爷爷
+            .where(
+                Comment.is_deleted == False,
+                Post.is_deleted == False,
+                Board.is_active == True
+            )
+        )
+        comment_count = self.db.exec(comment_count_stmt).one()
+
+        # 3. 有效板块数
         board_count = self.db.exec(select(func.count(Board.id)).where(Board.is_active == True)).one()
-        # 待处理举报数 (status == 0)
+
+        # 4. 待处理举报数
         pending_reports = self.db.exec(select(func.count(Report.id)).where(Report.status == 0)).one()
 
         return {
