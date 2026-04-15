@@ -56,6 +56,7 @@ class UserService:
             id=user.id,
             username=user.username,
             avatar=user.avatar,
+            role=user.role,
         )
 
         return login_vo

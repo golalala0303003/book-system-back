@@ -11,3 +11,5 @@ from .book import Book
 from .book import BookVote
 from .book import BookFavorite
 from .book import BookBrowseHistory
+
+from .report import Report

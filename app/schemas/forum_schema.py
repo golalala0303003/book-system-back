@@ -147,3 +147,40 @@ class PostVoteDTO(BaseModel):
 class CommentVoteDTO(BaseModel):
     comment_id: int = Field(..., description="目标评论ID")
     vote_type: int = Field(..., description="操作类型：1 为赞，-1 为踩")
+
+class ReportCreateDTO(BaseModel):
+    """用户提交举报的参数"""
+    target_type: str = Field(..., description="目标类型：'board', 'post', 或 'comment'")
+    target_id: int = Field(..., description="具体的被举报对象ID")
+    reason: str = Field(..., max_length=500, description="具体的举报原因")
+
+class ReportAdminQueryDTO(BaseModel):
+    """管理员分页查询聚合举报列表参数"""
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=10, ge=1, le=100)
+    status: int = Field(default=0, description="筛选状态: 0待处理, 1已处理, 2已驳回")
+    target_type: Optional[str] = Field(default=None, description="可选过滤: board, post, comment")
+
+class ReportAggregatedVO(BaseModel):
+    """管理端展示的聚合举报对象"""
+    target_type: str
+    target_id: int
+    report_count: int = Field(description="该对象被举报的总次数")
+    latest_report_time: datetime = Field(description="最近一次被举报的时间")
+    target_preview_text: str = Field(default="[目标已删除或无法预览]", description="帖子标题或评论内容预览")
+
+class ReportDetailVO(BaseModel):
+    """单一举报记录的详细信息"""
+    id: int
+    user_id: int
+    reason: str
+    create_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ReportProcessDTO(BaseModel):
+    """管理员处理举报的请求参数"""
+    target_type: str = Field(..., description="目标类型: 'board', 'post', 'comment'")
+    target_id: int = Field(..., description="目标ID")
+    action: int = Field(..., description="处理结果: 1=判定违规并下架, 2=判定合法并驳回")
+    remark: Optional[str] = Field(default=None, description="处理备注")

@@ -19,7 +19,7 @@ class BookMatrixCache:
         从数据库全量加载 TF-IDF 向量至内存。
         启动时调用
         """
-        statement = select(Book.id, Book.tfidf_vector).where(Book.tfidf_vector is not None)
+        statement = select(Book.id, Book.tfidf_vector).where(Book.tfidf_vector is not None, Book.is_active == 1)
         results = db.exec(statement).all()
 
         new_cache = {}

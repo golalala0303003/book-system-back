@@ -93,6 +93,8 @@ class BookAdminQueryDTO(BaseModel):
     size: int = Field(default=10, ge=1, le=100, description="每页条数")
     keyword: Optional[str] = Field(default=None, description="搜索书名/作者/ISBN")
     is_active: Optional[bool] = Field(default=None, description="上架状态: True已上架, False已下架, 不传查全部")
+    sort_by: str = Field(default="create_time", description="排序字段")
+    sort_order: str = Field(default="desc", description="排序方向：asc (升序), desc (降序)")
 
 class BookAdminVO(BaseModel):
     """管理端展示的图书简要信息"""

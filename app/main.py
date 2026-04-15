@@ -51,6 +51,7 @@ app.include_router(forum_controller.comment_router)
 app.include_router(book_controller.book_router)
 app.include_router(ai_controller.ai_router)
 app.include_router(admin_controller.admin_router)
+app.include_router(forum_controller.forum_router)
 
 register_exception_handlers(app)
 

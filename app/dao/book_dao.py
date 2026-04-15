@@ -245,8 +245,24 @@ class BookDao:
         count_statement = select(func.count()).select_from(statement.subquery())
         total = self.db.exec(count_statement).one()
 
-        # 3. 按入库时间倒序排
-        statement = statement.order_by(Book.create_time.desc())
+        sort_mapping = {
+            "id": Book.id,
+            "douban_id": Book.douban_id,
+            "title": Book.title,
+            "author": Book.author,
+            "isbn": Book.isbn,
+            "view_count": Book.view_count,
+            "create_time": Book.create_time,
+        }
+
+        # 获取目标排序字段，如果前端传了不认识的字段，则回退到 create_time
+        sort_column = sort_mapping.get(dto.sort_by, Book.create_time)
+
+        # 根据方向应用排序
+        if dto.sort_order.lower() == "asc":
+            statement = statement.order_by(sort_column.asc())
+        else:
+            statement = statement.order_by(sort_column.desc())
 
         # 4. 分页提取
         statement = statement.offset((dto.page - 1) * dto.size).limit(dto.size)
@@ -260,3 +276,8 @@ class BookDao:
         """
         statement = select(Book).where(Book.id == book_id)
         return self.db.exec(statement).first()
+
+    def get_total_books(self) -> int:
+        """获取总图书数"""
+        statement = select(func.count(Book.id))
+        return self.db.exec(statement).one()

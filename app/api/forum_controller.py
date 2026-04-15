@@ -6,7 +6,7 @@ from app.dependencies import get_current_user, get_current_user_optional
 from app.service.book_service import BookService
 from app.service.forum_service import ForumService
 from app.schemas.forum_schema import BoardCreateDTO, BoardDeleteDTO, BoardVO, PostQueryDTO, PostUpdateDTO, \
-    CommentCreateDTO, CommentDeleteDTO, PostVoteDTO, CommentVoteDTO, BoardFavoriteDTO
+    CommentCreateDTO, CommentDeleteDTO, PostVoteDTO, CommentVoteDTO, BoardFavoriteDTO, ReportCreateDTO
 from app.schemas.forum_schema import PostCreateDTO, PostDeleteDTO, PostVO
 from app.schemas.result import Result, PageData
 from typing import Optional
@@ -15,6 +15,7 @@ from app.service.user_service import UserService
 board_router = APIRouter(prefix="/board", tags=["论坛-板块模块"])
 post_router = APIRouter(prefix="/post", tags=["论坛-帖子模块"])
 comment_router = APIRouter(prefix="/comment", tags=["论坛-评论模块"])
+forum_router = APIRouter(prefix="/forum", tags=["论坛-总模块"])
 
 @board_router.post("/create")
 def create_board(
@@ -248,3 +249,15 @@ def get_recommend_posts_page(
             vo.book = book_service.get_book_detail(vo.book_id, False, current_user)
 
     return Result.success(data=page_data, message="获取个性化帖子推荐成功")
+
+@forum_router.post("/report", response_model=Result)
+def submit_report(
+    dto: ReportCreateDTO,
+    current_user: User = Depends(get_current_user),
+    service: ForumService = Depends()
+):
+    """
+    [C端] 提交举报 (支持举报帖子、评论、板块)
+    """
+    service.submit_report(dto, current_user.id)
+    return Result.success(message="举报已提交，感谢您的反馈，管理员将尽快处理")

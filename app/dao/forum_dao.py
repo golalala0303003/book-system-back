@@ -1,9 +1,9 @@
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, desc
 from fastapi import Depends
 from app.core.db import get_db
-from app.models import BookFavorite
+from app.models import BookFavorite, Report
 from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite, PostBrowseHistory
-from app.schemas.forum_schema import PostQueryDTO
+from app.schemas.forum_schema import PostQueryDTO, ReportAdminQueryDTO
 from sqlalchemy import case
 
 class ForumDao:
@@ -135,7 +135,16 @@ class ForumDao:
         return total, records
 
     def get_post_browse_ids(self, user_id, page, size):
-        statement = select(PostBrowseHistory.post_id).where(PostBrowseHistory.user_id == user_id).order_by(PostBrowseHistory.last_view_time.desc())
+        """获取用户浏览记录的帖子ID，同时过滤掉已删除的帖子"""
+        statement = (
+            select(PostBrowseHistory.post_id)
+            .join(Post, PostBrowseHistory.post_id == Post.id)  # 关联帖子表
+            .where(
+                PostBrowseHistory.user_id == user_id,
+                Post.is_deleted == False
+            )
+            .order_by(PostBrowseHistory.last_view_time.desc())
+        )
 
         count_statement = select(func.count()).select_from(statement.subquery())
         total = self.db.exec(count_statement).one()
@@ -283,3 +292,93 @@ class ForumDao:
             self.db.add(new_history)
 
         self.db.commit()
+
+    def create_report(self, report: Report) -> Report:
+        """创建一条举报记录"""
+        self.db.add(report)
+        self.db.commit()
+        self.db.refresh(report)
+        return report
+
+    def get_aggregated_reports_page(self, dto: ReportAdminQueryDTO) -> tuple[int, list]:
+        """
+        [管理端] 聚合查询：按 target_type 和 target_id 分组统计
+        """
+        # 1. 基础过滤条件
+        base_stmt = select(Report.target_type, Report.target_id).where(Report.status == dto.status)
+        if dto.target_type:
+            base_stmt = base_stmt.where(Report.target_type == dto.target_type)
+
+        # 2. 计算总的分组数 (用于完美分页)
+        group_subquery = base_stmt.group_by(Report.target_type, Report.target_id).subquery()
+        count_stmt = select(func.count()).select_from(group_subquery)
+        total = self.db.exec(count_stmt).one()
+
+        # 3. 提取聚合字段并按被举报次数倒序
+        stmt = select(
+            Report.target_type,
+            Report.target_id,
+            func.count(Report.id).label("report_count"),
+            func.max(Report.create_time).label("latest_report_time")
+        ).where(Report.status == dto.status)
+
+        if dto.target_type:
+            stmt = stmt.where(Report.target_type == dto.target_type)
+
+        stmt = stmt.group_by(Report.target_type, Report.target_id)
+        stmt = stmt.order_by(desc("report_count"), desc("latest_report_time"))
+
+        # 4. 执行分页
+        stmt = stmt.offset((dto.page - 1) * dto.size).limit(dto.size)
+        records = self.db.exec(stmt).all()
+
+        # records 返回的是 tuple 列表: (target_type, target_id, report_count, latest_report_time)
+        return total, records
+
+    def get_report_details(self, target_type: str, target_id: int, status: int) -> list[Report]:
+        """
+        [管理端] 获取单一目标的所有详细举报记录
+        """
+        stmt = select(Report).where(
+            Report.target_type == target_type,
+            Report.target_id == target_id,
+            Report.status == status
+        ).order_by(Report.create_time.desc())
+        return self.db.exec(stmt).all()
+
+    def update_reports_status_batch(self, target_type: str, target_id: int, new_status: int):
+        """
+        [管理端] 批量更新针对某一目标的待处理举报工单
+        """
+        # 找到该目标下所有状态为 0 (待处理) 的举报单
+        statement = select(Report).where(
+            Report.target_type == target_type,
+            Report.target_id == target_id,
+            Report.status == 0
+        )
+        reports = self.db.exec(statement).all()
+
+        for report in reports:
+            report.status = new_status
+            self.db.add(report)
+
+        # 这里先不 commit，由 Service 统一提交事务
+        self.db.flush()
+
+    def get_forum_stats(self) -> dict:
+        """获取论坛相关统计数据"""
+        # 总帖子数 (排除逻辑删除)
+        post_count = self.db.exec(select(func.count(Post.id)).where(Post.is_deleted == False)).one()
+        # 总评论数 (排除逻辑删除)
+        comment_count = self.db.exec(select(func.count(Comment.id)).where(Comment.is_deleted == False)).one()
+        # 有效板块数
+        board_count = self.db.exec(select(func.count(Board.id)).where(Board.is_active == True)).one()
+        # 待处理举报数 (status == 0)
+        pending_reports = self.db.exec(select(func.count(Report.id)).where(Report.status == 0)).one()
+
+        return {
+            "post_count": post_count,
+            "comment_count": comment_count,
+            "board_count": board_count,
+            "pending_reports": pending_reports
+        }

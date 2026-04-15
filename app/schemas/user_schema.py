@@ -22,6 +22,7 @@ class UserLoginVO(BaseModel):
     username: str = Field(description="用户名")
     id: int = Field(description="用户ID")
     avatar: Optional[str] = Field(description="用户头像")
+    role: str
 
 class UserInfoVO(BaseModel):
     """当前登录用户全量信息 VO"""
@@ -70,6 +71,8 @@ class UserAdminQueryDTO(BaseModel):
     size: int = Field(default=10, ge=1, le=100, description="每页数量")
     keyword: Optional[str] = Field(default=None, description="搜索用户名(模糊匹配)")
     is_active: Optional[bool] = Field(default=None, description="账号状态：True正常，False封禁，不传则查全部")
+    sort_by: str = Field(default="create_time", description="排序字段，例如：create_time, id, username")
+    sort_order: str = Field(default="desc", description="排序方向：asc (升序), desc (降序)")
 
 class UserAdminVO(BaseModel):
     """管理端展示的用户信息"""

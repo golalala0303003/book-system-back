@@ -21,3 +21,7 @@ class CommentNotExistsException(BusinessException):
 class InvalidCommentLevelException(BusinessException):
     def __init__(self):
         super().__init__(status_code=status.HTTP_401_UNAUTHORIZED, detail=ErrorMsg.INVALID_COMMENT_LEVEL)
+
+class IllegalReportTypeException(BusinessException):
+    def __init__(self):
+        super().__init__(status_code=status.HTTP_400_BAD_REQUEST, detail="错误的举报类型")

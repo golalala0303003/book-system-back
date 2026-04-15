@@ -2,12 +2,14 @@ from fastapi import Depends
 from app.dao.forum_dao import ForumDao
 from app.dao.user_dao import UserDao
 from app.exceptions.user_exceptions import UserNotPermittedException, UserNotFoundException
+from app.models import Report
 from app.models.user import User
 from app.models.forum import Board, Post, Comment, CommentVote, PostVote, BoardFavorite
 from app.schemas.forum_schema import BoardCreateDTO, BoardVO, PostCreateDTO, PostVO, PostQueryDTO, PostUpdateDTO, \
-    CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO, BoardSuggestVO
+    CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO, BoardSuggestVO, \
+    ReportCreateDTO, ReportAdminQueryDTO, ReportAggregatedVO, ReportDetailVO, ReportProcessDTO
 from app.exceptions.forum_exceptions import BoardAlreadyExistsException, BoardNotExistsException, \
-    PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException
+    PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException, IllegalReportTypeException
 from app.schemas.result import PageData
 from collections import defaultdict
 from typing import Optional
@@ -195,6 +197,8 @@ class ForumService:
         vo_list = []
         for post_id in ids:
             post = self.dao.get_post_by_id(post_id)
+            if post is None:
+                continue
             post_vo = PostVO.model_validate(post)
             post_vo.content = utils.extract_summary(post_vo.content, 30)
             vo_list.append(post_vo)
@@ -454,3 +458,105 @@ class ForumService:
                 vo.my_vote = vote_map.get(vo.id, 0)
 
         return PageData(total=total, page=page, size=size, records=vo_list)
+
+    def submit_report(self, dto: ReportCreateDTO, user_id: int) -> None:
+        """
+        [C端] 提交举报
+        """
+        # 1. 校验 target_type 是否合法
+        valid_types = ["board", "post", "comment"]
+        if dto.target_type not in valid_types:
+            raise IllegalReportTypeException()
+
+        # 2. 校验目标实体是否存在 (复用现有的查询方法)
+        target_exists = False
+        if dto.target_type == "board":
+            target_exists = self.dao.get_board_by_id(dto.target_id) is not None
+        elif dto.target_type == "post":
+            target_exists = self.dao.get_post_by_id(dto.target_id) is not None
+        elif dto.target_type == "comment":
+            target_exists = self.dao.get_comment_by_id(dto.target_id) is not None
+
+        if not target_exists:
+            raise IllegalReportTypeException()
+
+        # 3. 构建实体并保存
+        new_report = Report(
+            user_id=user_id,
+            target_type=dto.target_type,
+            target_id=dto.target_id,
+            reason=dto.reason
+        )
+        self.dao.create_report(new_report)
+
+    def get_admin_report_page(self, query_dto: ReportAdminQueryDTO) -> PageData[ReportAggregatedVO]:
+        """获取聚合举报列表并拼装预览信息"""
+        total, records = self.dao.get_aggregated_reports_page(query_dto)
+
+        vo_list = []
+        for record in records:
+            # record 为 SQLModel 解析出的 tuple
+            t_type, t_id, r_count, latest_time = record
+
+            # 动态抓取被举报对象的内容片段作为预览
+            preview_text = "[目标已删除或无法预览]"
+            if t_type == "board":
+                board = self.dao.get_board_by_id(t_id)
+                if board:
+                    preview_text = f"板块名称: {board.name}"
+            elif t_type == "post":
+                post = self.dao.get_post_by_id(t_id)
+                if post:
+                    preview_text = f"帖子标题: {post.title}"
+            elif t_type == "comment":
+                comment = self.dao.get_comment_by_id(t_id)
+                if comment:
+                    preview_text = f"评论内容: {comment.content[:30]}..."  # 截取前30字
+
+            vo_list.append(ReportAggregatedVO(
+                target_type=t_type,
+                target_id=t_id,
+                report_count=r_count,
+                latest_report_time=latest_time,
+                target_preview_text=preview_text
+            ))
+
+        return PageData(total=total, page=query_dto.page, size=query_dto.size, records=vo_list)
+
+    def get_admin_report_detail(self, target_type: str, target_id: int, status: int) -> list[ReportDetailVO]:
+        """获取具体的举报工单列表"""
+        reports = self.dao.get_report_details(target_type, target_id, status)
+        return [ReportDetailVO.model_validate(r) for r in reports]
+
+    def process_reports(self, dto: ReportProcessDTO) -> str:
+        """
+        [管理端] 处理举报工单：一键封禁内容并结案
+        """
+        # 1. 如果 action == 1 (判定违规)，则执行内容的逻辑删除/封禁
+        if dto.action == 1:
+            if dto.target_type == "board":
+                target = self.dao.get_board_by_id(dto.target_id)
+                if target: target.is_active = False
+            elif dto.target_type == "post":
+                target = self.dao.get_post_by_id(dto.target_id)
+                if target: target.is_deleted = True
+            elif dto.target_type == "comment":
+                target = self.dao.get_comment_by_id(dto.target_id)
+                if target: target.is_deleted = True
+
+            # 保存内容状态修改
+            if target:
+                self.dao.db.add(target)
+
+        # 2. 无论 action 是 1 还是 2，都要批量更新举报单状态
+        # 如果 action == 1，举报单设为 1 (成立)；如果 action == 2，举报单设为 2 (驳回)
+        self.dao.update_reports_status_batch(
+            target_type=dto.target_type,
+            target_id=dto.target_id,
+            new_status=dto.action
+        )
+
+        # 3. 统一提交事务
+        self.dao.db.commit()
+
+        return "内容已下架并处理相关工单" if dto.action == 1 else "已驳回该举报"

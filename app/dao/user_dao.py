@@ -89,7 +89,7 @@ class UserDao:
 
     def get_users_page_for_admin(self, dto: UserAdminQueryDTO) -> tuple[int, list[User]]:
         """
-        [管理端] 分页条件查询用户列表
+        [管理端] 分页条件查询用户列表 (包含动态排序)
         """
         statement = select(User)
 
@@ -104,9 +104,30 @@ class UserDao:
         count_statement = select(func.count()).select_from(statement.subquery())
         total = self.db.exec(count_statement).one()
 
-        # 3. 按注册时间倒序排，并进行分页
-        statement = statement.order_by(User.create_time.desc())
+        # 3. 动态拼接排序逻辑 (核心修改点)
+        # 定义允许排序的字段白名单，防止异常字段注入
+        sort_mapping = {
+            "create_time": User.create_time,
+            "id": User.id,
+            "username": User.username
+        }
+
+        # 获取目标排序字段，如果前端传了不认识的字段，则回退到 create_time
+        sort_column = sort_mapping.get(dto.sort_by, User.create_time)
+
+        # 根据方向应用排序
+        if dto.sort_order.lower() == "asc":
+            statement = statement.order_by(sort_column.asc())
+        else:
+            statement = statement.order_by(sort_column.desc())
+
+        # 4. 按注册时间倒序排，并进行分页
         statement = statement.offset((dto.page - 1) * dto.size).limit(dto.size)
 
         records = self.db.exec(statement).all()
         return total, records
+
+    def get_total_users(self) -> int:
+        """获取总用户数"""
+        statement = select(func.count(User.id))
+        return self.db.exec(statement).one()
