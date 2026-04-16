@@ -8,7 +8,8 @@ from app.models import User
 from app.schemas.admin_schema import DashboardVO
 from app.schemas.book_schema import BookAdminQueryDTO, BookAdminVO, BookStatusUpdateDTO, BookCreateDTO, BookUpdateDTO
 from app.schemas.forum_schema import ReportAggregatedVO, ReportAdminQueryDTO, ReportDetailVO, ReportProcessDTO, \
-    BoardAdminVO, BoardAdminQueryDTO, BoardStatusUpdateDTO
+    BoardAdminVO, BoardAdminQueryDTO, BoardStatusUpdateDTO, PostAdminQueryDTO, PostAdminSummaryVO, PostAdminDetailVO, \
+    PostStatusUpdateDTO
 from app.schemas.result import Result, PageData
 from app.schemas.user_schema import UserAdminVO, UserAdminQueryDTO, UserStatusUpdateDTO
 from app.service.admin_service import AdminService
@@ -130,6 +131,38 @@ def update_book(
     """修改书籍信息 (仅限管理员，支持部分字段更新)"""
     book_vo = book_service.update_book(dto, current_user)
     return Result.success(data=book_vo, message="书籍修改成功")
+
+@admin_router.post("/post/page", response_model=Result[PageData[PostAdminSummaryVO]])
+def get_post_page_for_admin(
+    dto: PostAdminQueryDTO,
+    admin_user: User = Depends(get_current_admin),
+    service: ForumService = Depends()
+):
+    """[管理端] 分页获取帖子列表"""
+    page_data = service.get_post_page_for_admin(dto)
+    return Result.success(data=page_data, message="获取帖子列表成功")
+
+@admin_router.get("/post/{post_id}", response_model=Result[PostAdminDetailVO])
+def get_post_detail_for_admin(
+    post_id: int,
+    admin_user: User = Depends(get_current_admin),
+    service: ForumService = Depends()
+):
+    """[管理端] 获取帖子详细信息"""
+    detail_vo = service.get_post_detail_for_admin(post_id)
+    return Result.success(data=detail_vo, message="获取帖子详情成功")
+
+@admin_router.post("/post/{post_id}/status", response_model=Result)
+def update_post_status_for_admin(
+    post_id: int,
+    status_dto: PostStatusUpdateDTO,
+    admin_user: User = Depends(get_current_admin),
+    service: ForumService = Depends()
+):
+    """[管理端] 调整帖子状态 (封禁/恢复)"""
+    service.update_post_status(post_id, status_dto)
+    action_msg = "封禁" if status_dto.is_deleted else "恢复"
+    return Result.success(message=f"帖子{action_msg}操作成功")
 
 @admin_router.post("/report/page", response_model=Result[PageData[ReportAggregatedVO]])
 def get_report_page_for_admin(

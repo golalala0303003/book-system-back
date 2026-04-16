@@ -3,10 +3,10 @@ from typing import Optional
 from sqlmodel import Session, select, func, desc, or_
 from fastapi import Depends
 from app.core.db import get_db
-from app.models import BookFavorite, Report
+from app.models import BookFavorite, Report, Book
 from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite, PostBrowseHistory
 from app.models.user import User
-from app.schemas.forum_schema import PostQueryDTO, ReportAdminQueryDTO
+from app.schemas.forum_schema import PostQueryDTO, ReportAdminQueryDTO, PostAdminQueryDTO
 from sqlalchemy import case
 
 class ForumDao:
@@ -489,3 +489,93 @@ class ForumDao:
             records.append(board_data)
 
         return total, records
+
+    def get_posts_page_for_admin(self, dto: PostAdminQueryDTO) -> tuple[int, list[dict]]:
+        """
+        [管理端] 分页条件查询帖子列表 (四表联查，包含封禁帖子)
+        """
+        # 1. 基础查询：选出 Post 所有字段 + 关联表的名称字段
+        # 注意 Book 必须使用 isouter=True (也就是 LEFT JOIN 左连接)
+        statement = (
+            select(
+                Post,
+                User.username,
+                Board.name.label("board_name"),
+                Book.title.label("book_title")
+            )
+            .join(User, Post.user_id == User.id)
+            .join(Board, Post.board_id == Board.id)
+            .join(Book, Post.book_id == Book.id, isouter=True)
+        )
+
+        # 2. 动态拼接条件 (无视 is_deleted 默认拦截)
+        if dto.keyword:
+            search_str = f"%{dto.keyword}%"
+            if dto.keyword.isdigit():
+                statement = statement.where(or_(Post.id == int(dto.keyword), Post.title.like(search_str)))
+            else:
+                statement = statement.where(Post.title.like(search_str))
+
+        if dto.board_id:
+            statement = statement.where(Post.board_id == dto.board_id)
+        if dto.user_id:
+            statement = statement.where(Post.user_id == dto.user_id)
+        if dto.book_id:
+            statement = statement.where(Post.book_id == dto.book_id)
+        if dto.is_deleted is not None:
+            statement = statement.where(Post.is_deleted == dto.is_deleted)
+
+        # 3. 统计总数
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = self.db.exec(count_statement).one()
+
+        # 4. 排序逻辑
+        sort_mapping = {
+            "id": Post.id,
+            "title": Post.title,
+            "view_count": Post.view_count,
+            "create_time": Post.create_time,
+        }
+        sort_column = sort_mapping.get(dto.sort_by, Post.create_time)
+        statement = statement.order_by(sort_column.asc() if dto.sort_order.lower() == "asc" else sort_column.desc())
+
+        # 5. 分页截取
+        statement = statement.offset((dto.page - 1) * dto.size).limit(dto.size)
+        results = self.db.exec(statement).all()
+
+        # 6. 拼装为字典列表
+        records = []
+        for post, username, board_name, book_title in results:
+            post_dict = post.model_dump()
+            post_dict.update({
+                "username": username,
+                "board_name": board_name,
+                "book_title": book_title
+            })
+            records.append(post_dict)
+
+        return total, records
+
+    def get_post_detail_dict_for_admin(self, post_id: int) -> dict | None:
+        """[管理端] 获取帖子详情的四表联查字典"""
+        statement = (
+            select(
+                Post, User.username, Board.name.label("board_name"), Book.title.label("book_title")
+            )
+            .join(User, Post.user_id == User.id)
+            .join(Board, Post.board_id == Board.id)
+            .join(Book, Post.book_id == Book.id, isouter=True)
+            .where(Post.id == post_id)
+        )
+        result = self.db.exec(statement).first()
+        if not result:
+            return None
+
+        post, username, board_name, book_title = result
+        post_dict = post.model_dump()
+        post_dict.update({"username": username, "board_name": board_name, "book_title": book_title})
+        return post_dict
+
+    def get_raw_post_for_admin(self, post_id: int) -> Post | None:
+        """[管理端] 获取原生Post对象，专用于修改状态"""
+        return self.db.get(Post, post_id)

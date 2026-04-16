@@ -8,7 +8,8 @@ from app.models.forum import Board, Post, Comment, CommentVote, PostVote, BoardF
 from app.schemas.forum_schema import BoardCreateDTO, BoardVO, PostCreateDTO, PostVO, PostQueryDTO, PostUpdateDTO, \
     CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO, BoardSuggestVO, \
     ReportCreateDTO, ReportAdminQueryDTO, ReportAggregatedVO, ReportDetailVO, ReportProcessDTO, BoardAdminVO, \
-    BoardAdminQueryDTO, BoardStatusUpdateDTO
+    BoardAdminQueryDTO, BoardStatusUpdateDTO, PostAdminQueryDTO, PostAdminSummaryVO, PostAdminDetailVO, \
+    PostStatusUpdateDTO
 from app.exceptions.forum_exceptions import BoardAlreadyExistsException, BoardNotExistsException, \
     PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException, IllegalReportTypeException, \
     BoardHasBeenBannedException
@@ -596,3 +597,29 @@ class ForumService:
         self.forum_dao.db.commit()
 
         return "内容已下架并处理相关工单" if dto.action == 1 else "已驳回该举报"
+
+    def get_post_page_for_admin(self, dto: PostAdminQueryDTO) -> PageData[PostAdminSummaryVO]:
+        """[管理端] 分页获取帖子列表 (简略信息)"""
+        total, records = self.forum_dao.get_posts_page_for_admin(dto)
+        vo_list = [PostAdminSummaryVO.model_validate(record) for record in records]
+        return PageData(total=total, page=dto.page, size=dto.size, records=vo_list)
+
+    def get_post_detail_for_admin(self, post_id: int) -> PostAdminDetailVO:
+        """[管理端] 获取帖子完整详情"""
+        post_dict = self.forum_dao.get_post_detail_dict_for_admin(post_id)
+        if not post_dict:
+            raise PostNotExistsException()
+        return PostAdminDetailVO.model_validate(post_dict)
+
+    def update_post_status(self, post_id: int, status_dto: PostStatusUpdateDTO) -> None:
+        """[管理端] 更改帖子状态 (封禁/恢复)"""
+        # 注意这里获取的是原生对象，方便修改状态保存
+        post = self.forum_dao.get_raw_post_for_admin(post_id)
+        if not post:
+            raise PostNotExistsException()
+
+        if post.is_deleted == status_dto.is_deleted:
+            return
+
+        post.is_deleted = status_dto.is_deleted
+        self.forum_dao.update_post(post)

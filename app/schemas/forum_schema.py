@@ -209,3 +209,58 @@ class ReportProcessDTO(BaseModel):
     target_id: int = Field(..., description="目标ID")
     action: int = Field(..., description="处理结果: 1=判定违规并下架, 2=判定合法并驳回")
     remark: Optional[str] = Field(default=None, description="处理备注")
+
+class PostAdminQueryDTO(BaseModel):
+    """[管理端] 帖子分页查询参数"""
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=10, ge=1, le=100)
+    keyword: Optional[str] = Field(default=None, description="搜索标题或ID")
+    board_id: Optional[int] = Field(default=None)
+    user_id: Optional[int] = Field(default=None)
+    book_id: Optional[int] = Field(default=None, description="按关联书籍过滤")
+    is_deleted: Optional[bool] = Field(default=None)
+    sort_by: str = Field(default="create_time")
+    sort_order: str = Field(default="desc")
+
+class PostStatusUpdateDTO(BaseModel):
+    """[管理端] 更改帖子状态(封禁/解封)参数"""
+    is_deleted: bool = Field(..., description="目标状态：True为封禁(隐藏)，False为正常")
+
+class PostAdminSummaryVO(BaseModel):
+    """[管理端] 帖子列表简略视图 (不含富文本)"""
+    id: int
+    title: str
+    cover_image: Optional[str] = None
+    user_id: int
+    username: str
+    board_id: int
+    board_name: str
+    book_id: Optional[int] = None
+    book_title: Optional[str] = None
+    view_count: int
+    upvote_count: int
+    comment_count: int
+    is_deleted: bool
+    create_time: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class PostAdminDetailVO(BaseModel):
+    """[管理端] 帖子详情视图 (含富文本)"""
+    id: int
+    title: str
+    content: str
+    cover_image: Optional[str] = None
+    user_id: int
+    username: str
+    board_id: int
+    board_name: str
+    book_id: Optional[int] = None
+    book_title: Optional[str] = None
+    view_count: int
+    upvote_count: int
+    downvote_count: int
+    comment_count: int
+    is_deleted: bool
+    create_time: datetime
+    update_time: datetime
+    model_config = ConfigDict(from_attributes=True)
