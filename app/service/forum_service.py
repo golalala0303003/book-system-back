@@ -7,9 +7,11 @@ from app.models.user import User
 from app.models.forum import Board, Post, Comment, CommentVote, PostVote, BoardFavorite
 from app.schemas.forum_schema import BoardCreateDTO, BoardVO, PostCreateDTO, PostVO, PostQueryDTO, PostUpdateDTO, \
     CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO, BoardSuggestVO, \
-    ReportCreateDTO, ReportAdminQueryDTO, ReportAggregatedVO, ReportDetailVO, ReportProcessDTO
+    ReportCreateDTO, ReportAdminQueryDTO, ReportAggregatedVO, ReportDetailVO, ReportProcessDTO, BoardAdminVO, \
+    BoardAdminQueryDTO, BoardStatusUpdateDTO
 from app.exceptions.forum_exceptions import BoardAlreadyExistsException, BoardNotExistsException, \
-    PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException, IllegalReportTypeException
+    PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException, IllegalReportTypeException, \
+    BoardHasBeenBannedException
 from app.schemas.result import PageData
 from collections import defaultdict
 from typing import Optional
@@ -48,6 +50,8 @@ class ForumService:
         board = self.forum_dao.get_board_by_id(board_id)
         if not board:
             raise BoardNotExistsException()
+        if not board.is_active:
+            raise BoardHasBeenBannedException()
         board_vo = BoardVO.model_validate(board)
         if current_user:
             board_favorite = self.forum_dao.get_favorite_board(current_user.id, board.id)
@@ -79,6 +83,35 @@ class ForumService:
         boards = self.forum_dao.get_active_boards(limit)
         return [BoardVO.model_validate(b) for b in boards]
 
+    def get_board_page_for_admin(self, dto: BoardAdminQueryDTO) -> PageData[BoardAdminVO]:
+        # 调 DAO 查数据
+        total, records = self.forum_dao.get_board_page_for_admin(dto)
+        vo_list = [BoardAdminVO.model_validate(record) for record in records]
+
+        # 组装
+        return PageData(
+            total=total,
+            page=dto.page,
+            size=dto.size,
+            records=vo_list
+        )
+
+    def update_board_status(self, board_id: int, status_dto: BoardStatusUpdateDTO) -> None:
+        """
+        [管理端] 调整板块状态 (封禁/解封)
+        """
+        # 1. 查找板块是否存在
+        board = self.forum_dao.get_board_by_id(board_id)
+        if not board:
+            raise BoardNotExistsException()
+
+        # 2. 如果状态没有改变，直接返回
+        if board.is_active == status_dto.is_active:
+            return
+
+        # 3. 更新状态并保存到数据库
+        board.is_active = status_dto.is_active
+        self.forum_dao.update_board(board)
 
     def get_favorite_board_list(self, limit: int, current_user: User):
         # 没有登录的时候返回空
@@ -97,6 +130,9 @@ class ForumService:
         return vo_list
 
     def favorite_board(self, dto: BoardFavoriteDTO, current_user: User):
+        board = self.forum_dao.get_board_by_id(dto.board_id)
+        if not board or not board.is_active:
+            raise BoardNotExistsException()
         # 收藏
         if dto.status == 1:
             favorite_record = self.forum_dao.get_favorite_board(current_user.id, dto.board_id)
@@ -160,7 +196,6 @@ class ForumService:
 
         if record_view:
             self.forum_dao.increment_view_count(post_id)
-            # TODO 记录本次阅读行为
             if current_user:
                 self.forum_dao.record_browse_history(current_user.id, post_id)
 
@@ -471,7 +506,8 @@ class ForumService:
         # 2. 校验目标实体是否存在 (复用现有的查询方法)
         target_exists = False
         if dto.target_type == "board":
-            target_exists = self.forum_dao.get_board_by_id(dto.target_id) is not None
+            board = self.forum_dao.get_board_by_id(dto.target_id)
+            target_exists = board is not None and board.is_active
         elif dto.target_type == "post":
             target_exists = self.forum_dao.get_post_by_id(dto.target_id) is not None
         elif dto.target_type == "comment":

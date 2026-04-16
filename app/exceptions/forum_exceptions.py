@@ -10,6 +10,10 @@ class BoardNotExistsException(BusinessException):
     def __init__(self):
         super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=ErrorMsg.BOARD_ALREADY_EXISTS)
 
+class BoardHasBeenBannedException(BusinessException):
+    def __init__(self):
+        super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=ErrorMsg.BOARD_HAS_BEEN_BANNED)
+
 class PostNotExistsException(BusinessException):
     def __init__(self):
         super().__init__(status_code=status.HTTP_404_NOT_FOUND, detail=ErrorMsg.POST_NOT_EXISTS)

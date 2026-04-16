@@ -1,4 +1,5 @@
 class ErrorMsg:
+    BOARD_HAS_BEEN_BANNED = "板块已被封禁"
     USER_NOT_ALLOWED = "该操作需要管理员权限"
     USER_BAN = "您已被封禁"
     LLM_NOT_AVAILABLE = "大模型目前不可用"

@@ -7,7 +7,8 @@ from app.dependencies import get_current_user, get_current_user_optional, get_cu
 from app.models import User
 from app.schemas.admin_schema import DashboardVO
 from app.schemas.book_schema import BookAdminQueryDTO, BookAdminVO, BookStatusUpdateDTO, BookCreateDTO, BookUpdateDTO
-from app.schemas.forum_schema import ReportAggregatedVO, ReportAdminQueryDTO, ReportDetailVO, ReportProcessDTO
+from app.schemas.forum_schema import ReportAggregatedVO, ReportAdminQueryDTO, ReportDetailVO, ReportProcessDTO, \
+    BoardAdminVO, BoardAdminQueryDTO, BoardStatusUpdateDTO
 from app.schemas.result import Result, PageData
 from app.schemas.user_schema import UserAdminVO, UserAdminQueryDTO, UserStatusUpdateDTO
 from app.service.admin_service import AdminService
@@ -58,6 +59,30 @@ def get_book_page_for_admin(
     """
     page_data = book_service.get_admin_book_page(query_dto)
     return Result.success(data=page_data, message="获取图书列表成功")
+
+@admin_router.post("/forum/board/page", response_model=Result[PageData[BoardAdminVO]])
+def get_board_page(
+    dto: BoardAdminQueryDTO,
+    current_user: User = Depends(get_current_admin),
+    forum_service: ForumService = Depends()
+):
+    page_data = forum_service.get_board_page_for_admin(dto)
+    return Result.success(data=page_data, message=SuccessMsg.GET_BOARD_LIST_SUCCESS)
+
+@admin_router.post("/board/{board_id}/status", response_model=Result)
+def update_board_status(
+        board_id: int,
+        status_dto: BoardStatusUpdateDTO,
+        admin_user: User = Depends(get_current_admin), # 严格校验管理员权限
+        forum_service: ForumService = Depends()
+):
+    """
+    [管理端] 调整板块状态 (封禁/解封)
+    """
+    forum_service.update_board_status(board_id, status_dto)
+
+    action_msg = "解封" if status_dto.is_active else "封禁"
+    return Result.success(message=f"板块{action_msg}操作成功")
 
 @admin_router.get("/detail/{book_id}")
 def get_book_detail(

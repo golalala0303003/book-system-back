@@ -1,10 +1,11 @@
 from typing import Optional
 
-from sqlmodel import Session, select, func, desc
+from sqlmodel import Session, select, func, desc, or_
 from fastapi import Depends
 from app.core.db import get_db
 from app.models import BookFavorite, Report
 from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite, PostBrowseHistory
+from app.models.user import User
 from app.schemas.forum_schema import PostQueryDTO, ReportAdminQueryDTO
 from sqlalchemy import case
 
@@ -427,3 +428,64 @@ class ForumDao:
             "board_count": board_count,
             "pending_reports": pending_reports
         }
+
+    def get_board_page_for_admin(self, dto: "BoardAdminQueryDTO") -> tuple[int, list[dict]]:
+        """
+        [管理端] 分页条件查询板块列表，关联获取创建者名称
+        """
+        # 1. 基础查询：联表并选择 Board 所有字段及 User 的用户名
+        # 使用 .label("creator_name") 以匹配 VO 中的字段名
+        statement = select(Board, User.username.label("creator_name")).join(
+            User, Board.creator_id == User.id
+        )
+
+        # 2. 动态拼接过滤条件
+        if dto.keyword:
+            search_str = f"%{dto.keyword}%"
+            # ID 精确匹配和名称模糊匹配
+            if dto.keyword.isdigit():
+                statement = statement.where(
+                    or_(Board.id == int(dto.keyword), Board.name.like(search_str))
+                )
+            else:
+                statement = statement.where(Board.name.like(search_str))
+
+        if dto.is_active is not None:
+            statement = statement.where(Board.is_active == dto.is_active)
+
+        # 3. 统计符合条件的总数 (基于当前过滤条件的子查询)
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = self.db.exec(count_statement).one()
+
+        # 4. 动态排序映射
+        # 注意：creator_name 排序实际上是针对 User.username
+        sort_mapping = {
+            "id": Board.id,
+            "name": Board.name,
+            "creator_name": User.username,
+            "post_count": Board.post_count,
+            "create_time": Board.create_time,
+        }
+
+        sort_column = sort_mapping.get(dto.sort_by, Board.create_time)
+
+        if dto.sort_order.lower() == "asc":
+            statement = statement.order_by(sort_column.asc())
+        else:
+            statement = statement.order_by(sort_column.desc())
+
+        # 5. 分页截取
+        statement = statement.offset((dto.page - 1) * dto.size).limit(dto.size)
+
+        # 6. 执行查询并处理结果
+        # 执行结果每一行是 (Board对象, "用户名字符串")
+        results = self.db.exec(statement).all()
+
+        # 转换为 dict 列表，以便 Service 层的 model_validate 能够直接识别 creator_name
+        records = []
+        for board, creator_name in results:
+            board_data = board.model_dump()
+            board_data["creator_name"] = creator_name
+            records.append(board_data)
+
+        return total, records

@@ -29,6 +29,30 @@ class BoardVO(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class BoardAdminQueryDTO(BaseModel):
+    page: int = Field(default=1, ge=1, description="当前页码")
+    size: int = Field(default=10, ge=1, le=100, description="每页条数")
+    keyword: Optional[str] = Field(default=None, description="搜索id/板块名")
+    is_active: Optional[bool] = Field(default=None, description="上架状态: True已上架, False已下架, 不传查全部")
+    sort_by: str = Field(default="create_time", description="排序字段：id/name/creator_name/post_count")
+    sort_order: str = Field(default="desc", description="排序方向：asc (升序), desc (降序)")
+
+class BoardAdminVO(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    cover_url: Optional[str] = None
+    creator_id: int
+    creator_name: str
+    create_time: datetime
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+class BoardStatusUpdateDTO(BaseModel):
+    """管理员更新板块状态参数"""
+    is_active: bool = Field(..., description="目标状态：True为解封/正常，False为封禁/下架")
+
 class BoardSuggestVO(BaseModel):
     id: int
     name: str
