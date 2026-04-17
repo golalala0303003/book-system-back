@@ -1,5 +1,6 @@
 from typing import Optional
 
+from sqlalchemy.orm import aliased
 from sqlmodel import Session, select, func, desc, or_
 from fastapi import Depends
 from app.core.db import get_db
@@ -579,3 +580,78 @@ class ForumDao:
     def get_raw_post_for_admin(self, post_id: int) -> Post | None:
         """[管理端] 获取原生Post对象，专用于修改状态"""
         return self.db.get(Post, post_id)
+
+    def get_comments_page_for_admin(self, dto: "CommentAdminQueryDTO") -> tuple[int, list[dict]]:
+        """
+        [管理端] 分页条件查询评论列表 (多次 JOIN 联查)
+        """
+        # 核心魔法：为 User 表创建两个“别名实体”，彻底解决表名冲突
+        UserAuthor = aliased(User)
+        UserReplyTo = aliased(User)
+
+        # 1. 基础查询：选出核心字段与三个关联名称
+        statement = (
+            select(
+                Comment,
+                Post.title.label("post_title"),
+                UserAuthor.username.label("username"),
+                UserReplyTo.username.label("reply_to_username")
+            )
+            .join(Post, Comment.post_id == Post.id)
+            # 内连接：评论必定有作者
+            .join(UserAuthor, Comment.user_id == UserAuthor.id)
+            # 左连接：评论不一定有被回复人 (一级评论没有)
+            .join(UserReplyTo, Comment.reply_to_user_id == UserReplyTo.id, isouter=True)
+        )
+
+        # 2. 动态拼接条件
+        if dto.keyword:
+            search_str = f"%{dto.keyword}%"
+            if dto.keyword.isdigit():
+                statement = statement.where(or_(Comment.id == int(dto.keyword), Comment.content.like(search_str)))
+            else:
+                statement = statement.where(Comment.content.like(search_str))
+
+        if dto.post_id:
+            statement = statement.where(Comment.post_id == dto.post_id)
+        if dto.user_id:
+            statement = statement.where(Comment.user_id == dto.user_id)
+        if dto.parent_id is not None:
+            # 可以是 0 或者具体的 ID
+            statement = statement.where(Comment.parent_id == dto.parent_id)
+        if dto.is_deleted is not None:
+            statement = statement.where(Comment.is_deleted == dto.is_deleted)
+
+        # 3. 统计总数
+        count_statement = select(func.count()).select_from(statement.subquery())
+        total = self.db.exec(count_statement).one()
+
+        # 4. 排序逻辑
+        sort_mapping = {
+            "id": Comment.id,
+            "create_time": Comment.create_time,
+            "upvote_count": Comment.upvote_count
+        }
+        sort_column = sort_mapping.get(dto.sort_by, Comment.create_time)
+        statement = statement.order_by(sort_column.asc() if dto.sort_order.lower() == "asc" else sort_column.desc())
+
+        # 5. 分页截取
+        statement = statement.offset((dto.page - 1) * dto.size).limit(dto.size)
+        results = self.db.exec(statement).all()
+
+        # 6. 拼装为字典列表
+        records = []
+        for comment, post_title, username, reply_to_username in results:
+            c_dict = comment.model_dump()
+            c_dict.update({
+                "post_title": post_title,
+                "username": username,
+                "reply_to_username": reply_to_username
+            })
+            records.append(c_dict)
+
+        return total, records
+
+    def get_raw_comment_for_admin(self, comment_id: int) -> Comment | None:
+        """[管理端] 获取原生Comment对象，专用于修改状态"""
+        return self.db.get(Comment, comment_id)

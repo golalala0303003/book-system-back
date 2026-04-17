@@ -264,3 +264,53 @@ class PostAdminDetailVO(BaseModel):
     create_time: datetime
     update_time: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class CommentAdminQueryDTO(BaseModel):
+    """[管理端] 评论分页查询参数"""
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=10, ge=1, le=100)
+
+    keyword: Optional[str] = Field(default=None, description="搜索评论内容或ID")
+    post_id: Optional[int] = Field(default=None, description="按所属帖子过滤")
+    user_id: Optional[int] = Field(default=None, description="按评论人过滤")
+    parent_id: Optional[int] = Field(default=None, description="按父评论ID过滤(可用于查某条评论下的所有子评论)")
+    is_deleted: Optional[bool] = Field(default=None, description="状态过滤")
+
+    sort_by: str = Field(default="create_time")
+    sort_order: str = Field(default="desc")
+
+
+class CommentStatusUpdateDTO(BaseModel):
+    """[管理端] 更改评论状态(封禁/解封)参数"""
+    is_deleted: bool = Field(..., description="目标状态：True为封禁(隐藏)，False为正常")
+
+
+# --- 2. VO: 管理端展示出参 ---
+class CommentAdminVO(BaseModel):
+    """[管理端] 评论详细信息视图"""
+    id: int
+    content: str = Field(description="评论内容")
+
+    # 关联信息 1：所属帖子 (必须 INNER JOIN)
+    post_id: int
+    post_title: str = Field(description="所属帖子标题")
+
+    # 关联信息 2：评论人 (必须 INNER JOIN)
+    user_id: int
+    username: str = Field(description="评论人名称")
+
+    # 层级信息
+    parent_id: Optional[int] = None
+
+    # 关联信息 3：被回复人 (可选 LEFT JOIN)
+    reply_to_user_id: Optional[int] = None
+    reply_to_username: Optional[str] = Field(default=None, description="被回复人名称")
+
+    # 互动与状态数据
+    upvote_count: int
+    downvote_count: int
+    is_deleted: bool
+    create_time: datetime
+
+    model_config = ConfigDict(from_attributes=True)

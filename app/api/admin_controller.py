@@ -9,7 +9,7 @@ from app.schemas.admin_schema import DashboardVO
 from app.schemas.book_schema import BookAdminQueryDTO, BookAdminVO, BookStatusUpdateDTO, BookCreateDTO, BookUpdateDTO
 from app.schemas.forum_schema import ReportAggregatedVO, ReportAdminQueryDTO, ReportDetailVO, ReportProcessDTO, \
     BoardAdminVO, BoardAdminQueryDTO, BoardStatusUpdateDTO, PostAdminQueryDTO, PostAdminSummaryVO, PostAdminDetailVO, \
-    PostStatusUpdateDTO
+    PostStatusUpdateDTO, CommentAdminVO, CommentAdminQueryDTO, CommentStatusUpdateDTO
 from app.schemas.result import Result, PageData
 from app.schemas.user_schema import UserAdminVO, UserAdminQueryDTO, UserStatusUpdateDTO
 from app.service.admin_service import AdminService
@@ -208,3 +208,56 @@ def get_dashboard_data(
     """
     stats = service.get_dashboard_stats()
     return Result.success(data=stats, message="获取统计数据成功")
+
+@admin_router.post("/comment/page", response_model=Result[PageData[CommentAdminVO]])
+def get_comment_page_for_admin(
+    dto: CommentAdminQueryDTO,
+    admin_user: User = Depends(get_current_admin),
+    service: ForumService = Depends()
+):
+    """[管理端] 分页获取评论列表 (含上下文追溯)"""
+    page_data = service.get_comment_page_for_admin(dto)
+    return Result.success(data=page_data, message="获取评论列表成功")
+
+@admin_router.post("/comment/{comment_id}/status", response_model=Result)
+def update_comment_status_for_admin(
+    comment_id: int,
+    status_dto: CommentStatusUpdateDTO,
+    admin_user: User = Depends(get_current_admin),
+    service: ForumService = Depends()
+):
+    """[管理端] 调整评论状态 (封禁/恢复)"""
+    service.update_comment_status(comment_id, status_dto)
+    action_msg = "封禁" if status_dto.is_deleted else "恢复"
+    return Result.success(message=f"评论{action_msg}操作成功")
+
+@admin_router.post("/refresh-tags")
+def refresh_book_tags(
+        current_user: User = Depends(get_current_admin),
+        service: BookService = Depends()
+):
+    """
+    [管理员工具] 扫描全库书籍标签并更新索引映射表
+    用于在导入新书后，确保所有新标签都有对应的向量索引位。
+    """
+    if current_user.role != "admin":
+        return Result.fail(message="只有管理员有权操作此工具")
+
+    result = service.refresh_tag_indices()
+    return Result.success(data=result, message="标签索引表更新成功")
+
+
+@admin_router.post("/calculate-tfidf")
+def calculate_tfidf_vectors(
+        current_user: User = Depends(get_current_admin),
+        service: BookService = Depends()
+):
+    """
+    [管理员工具] 重新计算并刷新全库书籍的 TF-IDF 权重向量。
+    当新增大量图书、或者手动修改过标签字典后，应执行此操作。
+    """
+    try:
+        updated_count = service.calculate_all_books_tfidf()
+        return Result.success(data={"updated_count": updated_count}, message="TF-IDF 矩阵计算并存储成功！")
+    except Exception as e:
+        return Result.fail(message=f"计算失败: {str(e)}")

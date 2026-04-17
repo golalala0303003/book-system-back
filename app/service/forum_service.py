@@ -9,7 +9,7 @@ from app.schemas.forum_schema import BoardCreateDTO, BoardVO, PostCreateDTO, Pos
     CommentCreateDTO, CommentVO, RootCommentVO, CommentVoteDTO, PostVoteDTO, BoardFavoriteDTO, BoardSuggestVO, \
     ReportCreateDTO, ReportAdminQueryDTO, ReportAggregatedVO, ReportDetailVO, ReportProcessDTO, BoardAdminVO, \
     BoardAdminQueryDTO, BoardStatusUpdateDTO, PostAdminQueryDTO, PostAdminSummaryVO, PostAdminDetailVO, \
-    PostStatusUpdateDTO
+    PostStatusUpdateDTO, CommentAdminQueryDTO, CommentAdminVO, CommentStatusUpdateDTO
 from app.exceptions.forum_exceptions import BoardAlreadyExistsException, BoardNotExistsException, \
     PostNotExistsException, CommentNotExistsException, InvalidCommentLevelException, IllegalReportTypeException, \
     BoardHasBeenBannedException
@@ -623,3 +623,21 @@ class ForumService:
 
         post.is_deleted = status_dto.is_deleted
         self.forum_dao.update_post(post)
+
+    def get_comment_page_for_admin(self, dto: CommentAdminQueryDTO) -> PageData[CommentAdminVO]:
+        """[管理端] 分页获取评论列表"""
+        total, records = self.forum_dao.get_comments_page_for_admin(dto)
+        vo_list = [CommentAdminVO.model_validate(record) for record in records]
+        return PageData(total=total, page=dto.page, size=dto.size, records=vo_list)
+
+    def update_comment_status(self, comment_id: int, status_dto: CommentStatusUpdateDTO) -> None:
+        """[管理端] 更改评论状态 (封禁/恢复)"""
+        comment = self.forum_dao.get_raw_comment_for_admin(comment_id)
+        if not comment:
+            raise CommentNotExistsException()
+
+        if comment.is_deleted == status_dto.is_deleted:
+            return
+
+        comment.is_deleted = status_dto.is_deleted
+        self.forum_dao.update_comment(comment)
