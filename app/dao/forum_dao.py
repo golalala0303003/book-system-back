@@ -7,7 +7,7 @@ from app.core.db import get_db
 from app.models import BookFavorite, Report, Book
 from app.models.forum import Board, Post, Comment, PostVote, CommentVote, BoardFavorite, PostBrowseHistory
 from app.models.user import User
-from app.schemas.forum_schema import PostQueryDTO, ReportAdminQueryDTO, PostAdminQueryDTO
+from app.schemas.forum_schema import PostQueryDTO, ReportAdminQueryDTO, PostAdminQueryDTO, CommentAdminQueryDTO
 from sqlalchemy import case
 
 class ForumDao:
@@ -85,7 +85,8 @@ class ForumDao:
             .where(
                 Post.id == post_id,
                 Post.is_deleted == False,
-                Board.is_active == True  # 核心拦截
+                Post.is_banned == False,
+                Board.is_active == True
             )
         )
         return self.db.exec(statement).first()
@@ -116,7 +117,11 @@ class ForumDao:
         statement = (
             select(Post)
             .join(Board, Post.board_id == Board.id)
-            .where(Post.is_deleted == False, Board.is_active == True)
+            .where(
+                Post.is_deleted == False,
+                Post.is_banned == False,
+                Board.is_active == True
+            )
         )
 
         # 动态追加筛选条件
@@ -159,7 +164,8 @@ class ForumDao:
             .where(
                 PostBrowseHistory.user_id == user_id,
                 Post.is_deleted == False,
-                Board.is_active == True  # 拦截点
+                Board.is_active == True,
+                Post.is_banned == False
             )
             .order_by(PostBrowseHistory.last_view_time.desc())
         )
@@ -172,7 +178,11 @@ class ForumDao:
 
     # ---------------- 评论相关 ----------------
     def get_comment_by_id(self, comment_id: int) -> Comment | None:
-        statement = select(Comment).where(Comment.id == comment_id, Comment.is_deleted == False)
+        statement = select(Comment).where(
+ Comment.id == comment_id,
+            Comment.is_deleted == False,
+            Comment.is_banned == False
+        )
         return self.db.exec(statement).first()
 
     def create_comment(self, comment: Comment) -> Comment:
@@ -191,7 +201,8 @@ class ForumDao:
         """获取某个帖子下的所有未删除评论，按时间升序排列 (老的在上面)"""
         statement = select(Comment).where(
             Comment.post_id == post_id,
-            Comment.is_deleted == False
+            Comment.is_deleted == False,
+            Comment.is_banned == False
         ).order_by(Comment.create_time.asc())
         return self.db.exec(statement).all()
 
@@ -269,7 +280,7 @@ class ForumDao:
             select(func.count())
             .select_from(Post)
             .join(Board, Post.board_id == Board.id)
-            .where(Post.is_deleted == False, Board.is_active == True)
+            .where(Post.is_deleted == False, Post.is_banned == False, Board.is_active == True)
         )
         total = self.db.exec(count_stmt).one()
 
@@ -277,7 +288,7 @@ class ForumDao:
         statement = (
             select(Post)
             .join(Board, Post.board_id == Board.id)
-            .where(Post.is_deleted == False, Board.is_active == True)
+            .where(Post.is_deleted == False, Post.is_banned == False, Board.is_active == True)
         )
 
         if book_ids:
@@ -400,7 +411,7 @@ class ForumDao:
         post_count_stmt = (
             select(func.count(Post.id))
             .join(Board, Post.board_id == Board.id)
-            .where(Post.is_deleted == False, Board.is_active == True)
+            .where(Post.is_deleted == False, Post.is_banned == False, Board.is_active == True)
         )
         post_count = self.db.exec(post_count_stmt).one()
 
@@ -411,7 +422,9 @@ class ForumDao:
             .join(Board, Post.board_id == Board.id)  # 找爷爷
             .where(
                 Comment.is_deleted == False,
+                Comment.is_banned == False,
                 Post.is_deleted == False,
+                Post.is_banned == False,
                 Board.is_active == True
             )
         )
@@ -495,8 +508,8 @@ class ForumDao:
         """
         [管理端] 分页条件查询帖子列表 (四表联查，包含封禁帖子)
         """
-        # 1. 基础查询：选出 Post 所有字段 + 关联表的名称字段
-        # 注意 Book 必须使用 isouter=True (也就是 LEFT JOIN 左连接)
+        # 选出 Post 所有字段 关联表的名称字段
+        # 左连接
         statement = (
             select(
                 Post,
@@ -509,7 +522,7 @@ class ForumDao:
             .join(Book, Post.book_id == Book.id, isouter=True)
         )
 
-        # 2. 动态拼接条件 (无视 is_deleted 默认拦截)
+        # 拼接条件
         if dto.keyword:
             search_str = f"%{dto.keyword}%"
             if dto.keyword.isdigit():
@@ -523,14 +536,16 @@ class ForumDao:
             statement = statement.where(Post.user_id == dto.user_id)
         if dto.book_id:
             statement = statement.where(Post.book_id == dto.book_id)
+        if dto.is_banned is not None:
+            statement = statement.where(Post.is_banned == dto.is_banned)
         if dto.is_deleted is not None:
             statement = statement.where(Post.is_deleted == dto.is_deleted)
 
-        # 3. 统计总数
+        # 统计总数
         count_statement = select(func.count()).select_from(statement.subquery())
         total = self.db.exec(count_statement).one()
 
-        # 4. 排序逻辑
+        # 排序
         sort_mapping = {
             "id": Post.id,
             "title": Post.title,
@@ -583,7 +598,7 @@ class ForumDao:
 
     def get_comments_page_for_admin(self, dto: "CommentAdminQueryDTO") -> tuple[int, list[dict]]:
         """
-        [管理端] 分页条件查询评论列表 (多次 JOIN 联查)
+        [管理端] 分页条件查询评论列表
         """
         # 核心魔法：为 User 表创建两个“别名实体”，彻底解决表名冲突
         UserAuthor = aliased(User)
@@ -617,8 +632,9 @@ class ForumDao:
         if dto.user_id:
             statement = statement.where(Comment.user_id == dto.user_id)
         if dto.parent_id is not None:
-            # 可以是 0 或者具体的 ID
             statement = statement.where(Comment.parent_id == dto.parent_id)
+        if dto.is_banned is not None:
+            statement = statement.where(Comment.is_banned == dto.is_banned)
         if dto.is_deleted is not None:
             statement = statement.where(Comment.is_deleted == dto.is_deleted)
 

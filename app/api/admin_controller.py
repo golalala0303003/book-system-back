@@ -161,7 +161,14 @@ def update_post_status_for_admin(
 ):
     """[管理端] 调整帖子状态 (封禁/恢复)"""
     service.update_post_status(post_id, status_dto)
-    action_msg = "封禁" if status_dto.is_deleted else "恢复"
+
+    actions = []
+    if status_dto.is_banned is not None:
+        actions.append("封禁" if status_dto.is_banned else "解除封禁")
+    if status_dto.is_deleted is not None:
+        actions.append("标记为用户删除" if status_dto.is_deleted else "恢复用户误删")
+
+    action_msg = "、".join(actions) if actions else "无状态修改"
     return Result.success(message=f"帖子{action_msg}操作成功")
 
 @admin_router.post("/report/page", response_model=Result[PageData[ReportAggregatedVO]])
@@ -226,9 +233,17 @@ def update_comment_status_for_admin(
     admin_user: User = Depends(get_current_admin),
     service: ForumService = Depends()
 ):
-    """[管理端] 调整评论状态 (封禁/恢复)"""
+    """[管理端] 调整评论状态"""
     service.update_comment_status(comment_id, status_dto)
-    action_msg = "封禁" if status_dto.is_deleted else "恢复"
+
+    # 动态生成操作成功提示语
+    actions = []
+    if status_dto.is_banned is not None:
+        actions.append("封禁" if status_dto.is_banned else "解除封禁")
+    if status_dto.is_deleted is not None:
+        actions.append("标记为用户删除" if status_dto.is_deleted else "恢复用户误删")
+
+    action_msg = "、".join(actions) if actions else "无状态修改"
     return Result.success(message=f"评论{action_msg}操作成功")
 
 @admin_router.post("/refresh-tags")

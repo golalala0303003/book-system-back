@@ -612,17 +612,26 @@ class ForumService:
         return PostAdminDetailVO.model_validate(post_dict)
 
     def update_post_status(self, post_id: int, status_dto: PostStatusUpdateDTO) -> None:
-        """[管理端] 更改帖子状态 (封禁/恢复)"""
-        # 注意这里获取的是原生对象，方便修改状态保存
+        """[管理端] 更改帖子状态"""
         post = self.forum_dao.get_raw_post_for_admin(post_id)
         if not post:
             raise PostNotExistsException()
 
-        if post.is_deleted == status_dto.is_deleted:
-            return
+        is_modified = False
 
-        post.is_deleted = status_dto.is_deleted
-        self.forum_dao.update_post(post)
+        # 如果前端传了 is_banned，且与数据库当前值不同，则修改
+        if status_dto.is_banned is not None and post.is_banned != status_dto.is_banned:
+            post.is_banned = status_dto.is_banned
+            is_modified = True
+
+        # 如果前端传了 is_deleted，且与数据库当前值不同，则修改
+        if status_dto.is_deleted is not None and post.is_deleted != status_dto.is_deleted:
+            post.is_deleted = status_dto.is_deleted
+            is_modified = True
+
+        # 更新
+        if is_modified:
+            self.forum_dao.update_post(post)
 
     def get_comment_page_for_admin(self, dto: CommentAdminQueryDTO) -> PageData[CommentAdminVO]:
         """[管理端] 分页获取评论列表"""
@@ -631,13 +640,23 @@ class ForumService:
         return PageData(total=total, page=dto.page, size=dto.size, records=vo_list)
 
     def update_comment_status(self, comment_id: int, status_dto: CommentStatusUpdateDTO) -> None:
-        """[管理端] 更改评论状态 (封禁/恢复)"""
+        """[管理端] 更改评论状态"""
         comment = self.forum_dao.get_raw_comment_for_admin(comment_id)
         if not comment:
             raise CommentNotExistsException()
 
-        if comment.is_deleted == status_dto.is_deleted:
-            return
+        is_modified = False
 
-        comment.is_deleted = status_dto.is_deleted
-        self.forum_dao.update_comment(comment)
+        # 如果前端传了 is_banned，且与当前状态不同，则更新
+        if status_dto.is_banned is not None and comment.is_banned != status_dto.is_banned:
+            comment.is_banned = status_dto.is_banned
+            is_modified = True
+
+        # 如果前端传了 is_deleted，且与当前状态不同，则更新
+        if status_dto.is_deleted is not None and comment.is_deleted != status_dto.is_deleted:
+            comment.is_deleted = status_dto.is_deleted
+            is_modified = True
+
+        # 更新
+        if is_modified:
+            self.forum_dao.update_comment(comment)

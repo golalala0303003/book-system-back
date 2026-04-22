@@ -41,7 +41,8 @@ class UserDao:
         # 1. 发帖总数
         post_count_stmt = select(func.count(Post.id)).where(
             Post.user_id == user_id,
-            Post.is_deleted == False
+            Post.is_deleted == False,
+            Post.is_banned == False
         )
         post_count = self.db.exec(post_count_stmt).one_or_none() or 0
 
@@ -54,14 +55,16 @@ class UserDao:
         # 3. 帖子获赞数 (SUM 处理)
         post_upvote_stmt = select(func.sum(Post.upvote_count)).where(
             Post.user_id == user_id,
-            Post.is_deleted == False
+            Post.is_deleted == False,
+            Post.is_banned == False
         )
         post_upvotes = self.db.exec(post_upvote_stmt).one_or_none() or 0
 
         # 4. 评论获赞数 (SUM 处理)
         comment_upvote_stmt = select(func.sum(Comment.upvote_count)).where(
             Comment.user_id == user_id,
-            Comment.is_deleted == False
+            Comment.is_deleted == False,
+            Comment.is_banned == False
         )
         comment_upvotes = self.db.exec(comment_upvote_stmt).one_or_none() or 0
 
@@ -74,7 +77,8 @@ class UserDao:
         # 6. 参与评论的总数
         comment_count_stmt = select(func.count(Comment.id)).where(
             Comment.user_id == user_id,
-            Comment.is_deleted == False
+            Comment.is_deleted == False,
+            Comment.is_banned == False
         )
         comment_count = self.db.exec(comment_count_stmt).one_or_none() or 0
 

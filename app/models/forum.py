@@ -51,7 +51,8 @@ class Post(SQLModel, table=True):
     downvote_count: int = Field(default=0)  # 踩数
     comment_count: int = Field(default=0)  # 评论总数 (冗余字段，提升查询性能)
 
-    is_deleted: bool = Field(default=False)  # 逻辑删除标志
+    is_deleted: bool = Field(default=False, description="用户自己删除标志")
+    is_banned: bool = Field(default=False, description="管理员封禁标志")
 
     create_time: datetime = Field(sa_column=Column(DateTime, server_default=func.now(), nullable=False))
     update_time: datetime = Field(
@@ -86,7 +87,8 @@ class Comment(SQLModel, table=True):
     upvote_count: int = Field(default=0)  # 点赞数
     downvote_count: int = Field(default=0)  # 踩数
 
-    is_deleted: bool = Field(default=False)  # 逻辑删除
+    is_deleted: bool = Field(default=False, description="用户自己删除")
+    is_banned: bool = Field(default=False, description="管理员封禁标志")
 
     create_time: datetime = Field(sa_column=Column(DateTime, server_default=func.now(), nullable=False))
 

@@ -218,13 +218,15 @@ class PostAdminQueryDTO(BaseModel):
     board_id: Optional[int] = Field(default=None)
     user_id: Optional[int] = Field(default=None)
     book_id: Optional[int] = Field(default=None, description="按关联书籍过滤")
-    is_deleted: Optional[bool] = Field(default=None)
+    is_deleted: Optional[bool] = Field(default=None, description="按用户删除状态过滤")
+    is_banned: Optional[bool] = Field(default=None, description="按管理员封禁状态过滤")
     sort_by: str = Field(default="create_time")
     sort_order: str = Field(default="desc")
 
 class PostStatusUpdateDTO(BaseModel):
     """[管理端] 更改帖子状态(封禁/解封)参数"""
-    is_deleted: bool = Field(..., description="目标状态：True为封禁(隐藏)，False为正常")
+    is_banned: Optional[bool] = Field(default=None, description="目标封禁状态：True为封禁(隐藏)，False为正常")
+    is_deleted: Optional[bool] = Field(default=None, description="目标删除状态：用于管理员协助用户恢复误删帖子")
 
 class PostAdminSummaryVO(BaseModel):
     """[管理端] 帖子列表简略视图 (不含富文本)"""
@@ -241,6 +243,7 @@ class PostAdminSummaryVO(BaseModel):
     upvote_count: int
     comment_count: int
     is_deleted: bool
+    is_banned: bool
     create_time: datetime
     model_config = ConfigDict(from_attributes=True)
 
@@ -275,18 +278,19 @@ class CommentAdminQueryDTO(BaseModel):
     post_id: Optional[int] = Field(default=None, description="按所属帖子过滤")
     user_id: Optional[int] = Field(default=None, description="按评论人过滤")
     parent_id: Optional[int] = Field(default=None, description="按父评论ID过滤(可用于查某条评论下的所有子评论)")
-    is_deleted: Optional[bool] = Field(default=None, description="状态过滤")
+    is_deleted: Optional[bool] = Field(default=None, description="按用户删除状态过滤")
+    is_banned: Optional[bool] = Field(default=None, description="按管理员封禁状态过滤")
 
     sort_by: str = Field(default="create_time")
     sort_order: str = Field(default="desc")
 
 
 class CommentStatusUpdateDTO(BaseModel):
-    """[管理端] 更改评论状态(封禁/解封)参数"""
-    is_deleted: bool = Field(..., description="目标状态：True为封禁(隐藏)，False为正常")
+    """[管理端] 更改评论状态参数"""
+    is_banned: Optional[bool] = Field(default=None, description="目标封禁状态：True为封禁(隐藏)，False为正常")
+    is_deleted: Optional[bool] = Field(default=None, description="目标删除状态：用于管理员协助用户恢复误删评论")
 
 
-# --- 2. VO: 管理端展示出参 ---
 class CommentAdminVO(BaseModel):
     """[管理端] 评论详细信息视图"""
     id: int
@@ -311,6 +315,7 @@ class CommentAdminVO(BaseModel):
     upvote_count: int
     downvote_count: int
     is_deleted: bool
+    is_banned: bool
     create_time: datetime
 
     model_config = ConfigDict(from_attributes=True)
